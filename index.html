@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>宿舍管理員</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font-family: -apple-system, "PingFang TC", "Microsoft JhengHei", sans-serif; padding: 16px; max-width: 480px; margin: 0 auto; color: #222; }
+    h2 { font-size: 18px; margin: 20px 0 10px; }
+    .card { border: 1px solid #ddd; border-radius: 10px; padding: 14px; margin-bottom: 10px; }
+    .card h3 { margin: 0 0 6px; font-size: 15px; }
+    .card p { margin: 2px 0; font-size: 13px; color: #666; }
+    button { font-size: 15px; padding: 10px 14px; border-radius: 8px; border: none; background: #06c755; color: #fff; margin-top: 6px; }
+    button.secondary { background: #eee; color: #333; }
+    select, input { font-size: 15px; padding: 10px; width: 100%; box-sizing: border-box; margin: 6px 0; border: 1px solid #ccc; border-radius: 8px; }
+    #status { text-align: center; padding: 40px 0; color: #888; }
+    #bindScreen, #mainScreen { display: none; }
+    .status-row { display: flex; justify-content: space-between; padding: 8px 10px; border-bottom: 1px solid #eee; font-size: 14px; }
+    .status-row .s-paid { color: #06c755; font-weight: bold; }
+    .status-row .s-unconfirmed { color: #d68a00; font-weight: bold; }
+    .status-row .s-unpaid { color: #d33; font-weight: bold; }
+    #receiptResult { background: #f0fff4; border: 1px solid #06c755; border-radius: 10px; padding: 14px; margin-top: 10px; display: none; }
+  </style>
+</head>
+<body>
+
+  <div id="status">載入中…</div>
+
+  <div id="bindScreen">
+    <h2>管理員綁定</h2>
+    <p>請輸入公司給你的驗證碼完成第一次綁定：</p>
+    <input id="bindCode" placeholder="輸入驗證碼">
+    <button onclick="doBind()">送出</button>
+    <p id="bindMsg" style="color:#c00;"></p>
+  </div>
+
+  <div id="mainScreen">
+    <h2>本期繳費單</h2>
+    <div id="billList"></div>
+
+    <h2>繳費狀況查詢</h2>
+    <button class="secondary" onclick="loadStatus()">查詢本期繳費狀況</button>
+    <label style="display:block; margin:8px 0; font-size:14px;">
+      <input type="checkbox" id="onlyUnpaid" checked onchange="renderStatus()"> 只顯示未結清（未銷帳/已繳未銷）
+    </label>
+    <div id="statusList"></div>
+
+    <h2>現金收款登錄</h2>
+    <select id="roomSelect"></select>
+    <input id="amountInput" type="number" placeholder="收款金額">
+    <button onclick="submitCash()">確認收款並產生收據</button>
+    <div id="receiptResult"></div>
+  </div>
+
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <script>
+    var LIFF_ID = 'YOUR_LIFF_ID'; // 替換成 LINE Developers Console 拿到的 LIFF ID
+
+    // 換成你的 Apps Script 部署網址（結尾是 /exec）
+    var API_BASE = 'YOUR_APPS_SCRIPT_EXEC_URL';
+
+    var userId = null;
+    var allBills = [];
+    var allStatus = [];
+
+    window.onerror = function (msg, url, line) {
+      document.getElementById('status').style.display = 'block';
+      document.getElementById('status').innerText = '發生錯誤：' + msg + '（第 ' + line + ' 行）';
+    };
+
+    function callApi(action, params) {
+      params = params || {};
+      params.action = action;
+      var query = Object.keys(params)
+        .map(function (k) { return encodeURIComponent(k) + '=' + encodeURIComponent(params[k]); })
+        .join('&');
+      return fetch(API_BASE + '?' + query).then(function (res) {
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res.json();
+      });
+    }
+
+    document.getElementById('status').innerText = '正在初始化 LIFF…';
+
+    liff.init({ liffId: LIFF_ID }).then(function () {
+      document.getElementById('status').innerText = '正在確認登入狀態…';
+      if (!liff.isLoggedIn()) {
+        liff.login();
+        return;
+      }
+      document.getElementById('status').innerText = '正在取得個人資料…';
+      liff.getProfile().then(function (profile) {
+        userId = profile.userId;
+        document.getElementById('status').innerText = '正在確認管理員身分…';
+        checkBinding();
+      }).catch(function (err) {
+        document.getElementById('status').innerText = '取得個人資料失敗：' + err;
+      });
+    }).catch(function (err) {
+      document.getElementById('status').innerText = '初始化失敗：' + err;
+    });
+
+    function checkBinding() {
+      callApi('isManagerBound', { userId: userId }).then(function (bound) {
+        document.getElementById('status').style.display = 'none';
+        if (bound) {
+          showMain();
+        } else {
+          document.getElementById('bindScreen').style.display = 'block';
+        }
+      }).catch(function (err) {
+        document.getElementById('status').innerText = '連線後端失敗：' + err.message;
+      });
+    }
+
+    function doBind() {
+      var code = document.getElementById('bindCode').value.trim();
+      callApi('bindManager', { userId: userId, code: code }).then(function (res) {
+        if (res.success) {
+          document.getElementById('bindScreen').style.display = 'none';
+          showMain();
+        } else {
+          document.getElementById('bindMsg').innerText = res.message;
+        }
+      }).catch(function (err) {
+        document.getElementById('bindMsg').innerText = '連線失敗：' + err.message;
+      });
+    }
+
+    function showMain() {
+      document.getElementById('mainScreen').style.display = 'block';
+      loadBills();
+    }
+
+    function loadBills() {
+      callApi('getMonthlyBills').then(function (bills) {
+        allBills = bills;
+        renderBills(bills);
+        renderRoomOptions(bills);
+      }).catch(function (err) {
+        document.getElementById('billList').innerHTML = '<p style="color:#c00;">載入失敗：' + err.message + '</p>';
+      });
+    }
+
+    function renderBills(bills) {
+      var list = document.getElementById('billList');
+      if (bills.length === 0) {
+        list.innerHTML = '<p>本期尚未匯入繳費單</p>';
+        return;
+      }
+      list.innerHTML = bills.map(function (b) {
+        return '<div class="card">' +
+          '<h3>' + b.房號 + ' ' + b.租戶姓名 + '</h3>' +
+          '<p>電費：' + b.電費 + ' 元｜水費：' + b.水費 + ' 元｜應繳：' + b.應繳金額 + ' 元</p>' +
+          '<button onclick="shareBill(\'' + b.房號 + '\', \'' + (b.繳費單圖片網址 || '') + '\')">轉發給租戶</button>' +
+          '</div>';
+      }).join('');
+    }
+
+    function renderRoomOptions(bills) {
+      var select = document.getElementById('roomSelect');
+      select.innerHTML = '';
+      bills.forEach(function (b) {
+        var opt = document.createElement('option');
+        opt.value = b.房號;
+        opt.innerText = b.房號 + ' ' + b.租戶姓名;
+        select.appendChild(opt);
+      });
+    }
+
+    function shareBill(room, imageUrl) {
+      if (!imageUrl) {
+        alert('這個房號的繳費單圖片網址尚未設定');
+        return;
+      }
+      liff.shareTargetPicker([
+        {
+          type: 'image',
+          originalContentUrl: imageUrl,
+          previewImageUrl: imageUrl
+        },
+        {
+          type: 'text',
+          text: room + ' 本期繳費單，請確認金額並於期限前繳費，謝謝。'
+        }
+      ]).catch(function (err) {
+        alert('分享失敗：' + err);
+      });
+    }
+
+    function loadStatus() {
+      document.getElementById('statusList').innerHTML = '查詢中…';
+      callApi('getPaymentStatus').then(function (list) {
+        allStatus = list;
+        renderStatus();
+      }).catch(function (err) {
+        document.getElementById('statusList').innerHTML = '<p style="color:#c00;">查詢失敗：' + err.message + '</p>';
+      });
+    }
+
+    function renderStatus() {
+      var onlyUnpaid = document.getElementById('onlyUnpaid').checked;
+      var list = onlyUnpaid ? allStatus.filter(function (r) { return r.狀態 !== '已銷帳'; }) : allStatus;
+      var box = document.getElementById('statusList');
+      if (allStatus.length === 0) {
+        box.innerHTML = '';
+        return;
+      }
+      if (list.length === 0) {
+        box.innerHTML = '<p>全部房號本期都已銷帳</p>';
+        return;
+      }
+      var clsMap = { 已銷帳: 's-paid', 已繳未銷: 's-unconfirmed', 未銷帳: 's-unpaid' };
+      box.innerHTML = list.map(function (r) {
+        var cls = clsMap[r.狀態] || 's-unpaid';
+        return '<div class="status-row"><span>' + r.房號 + ' ' + r.租戶姓名 + '</span><span class="' + cls + '">' + r.狀態 + '</span></div>';
+      }).join('');
+    }
+
+    function submitCash() {
+      var room = document.getElementById('roomSelect').value;
+      var amount = document.getElementById('amountInput').value;
+      if (!room || !amount) {
+        alert('請選擇房號並輸入金額');
+        return;
+      }
+      callApi('submitCashPayment', { room: room, amount: amount, userId: userId }).then(function (res) {
+        if (!res.success) {
+          alert(res.message);
+          return;
+        }
+        var box = document.getElementById('receiptResult');
+        box.style.display = 'block';
+        box.innerHTML = '<p>收款成功</p>' +
+          '<p>收據編號：' + res.receiptNo + '</p>' +
+          '<p>時間：' + res.date + '</p>' +
+          '<button class="secondary" onclick="location.reload()">完成，繼續下一筆</button>';
+        document.getElementById('amountInput').value = '';
+      }).catch(function (err) {
+        alert('登錄失敗：' + err.message);
+      });
+    }
+  </script>
+</body>
+</html>
