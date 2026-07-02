@@ -133,14 +133,17 @@
       loadRooms();
     }
 
-    function loadRooms() {
-      callApi('getAllRooms').then(function (rooms) {
-        renderRoomOptions(rooms);
-      }).catch(function (err) {
-        document.getElementById('roomSelect').innerHTML = '';
-        alert('載入房號清單失敗：' + err.message);
-      });
-    }
+function loadRooms() {
+     callApi('getAllRooms').then(function (rooms) {
+       renderRoomOptions(rooms);
+     }).catch(function (err) {
+       var select = document.getElementById('roomSelect');
+       select.innerHTML = '';
+       var opt = document.createElement('option');
+       opt.innerText = '房號載入失敗：' + err.message;
+       select.appendChild(opt);
+     });
+   }
 
     function loadBills() {
       callApi('getMonthlyBills').then(function (bills) {
