@@ -130,13 +130,22 @@
     function showMain() {
       document.getElementById('mainScreen').style.display = 'block';
       loadBills();
+      loadRooms();
+    }
+
+    function loadRooms() {
+      callApi('getAllRooms').then(function (rooms) {
+        renderRoomOptions(rooms);
+      }).catch(function (err) {
+        document.getElementById('roomSelect').innerHTML = '';
+        alert('載入房號清單失敗：' + err.message);
+      });
     }
 
     function loadBills() {
       callApi('getMonthlyBills').then(function (bills) {
         allBills = bills;
         renderBills(bills);
-        renderRoomOptions(bills);
       }).catch(function (err) {
         document.getElementById('billList').innerHTML = '<p style="color:#c00;">載入失敗：' + err.message + '</p>';
       });
@@ -157,13 +166,13 @@
       }).join('');
     }
 
-    function renderRoomOptions(bills) {
+    function renderRoomOptions(rooms) {
       var select = document.getElementById('roomSelect');
       select.innerHTML = '';
-      bills.forEach(function (b) {
+      rooms.forEach(function (r) {
         var opt = document.createElement('option');
-        opt.value = b.房號;
-        opt.innerText = b.房號 + ' ' + b.租戶姓名;
+        opt.value = r.房號;
+        opt.innerText = r.房號 + ' ' + r.租戶姓名;
         select.appendChild(opt);
       });
     }
