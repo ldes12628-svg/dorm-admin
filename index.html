@@ -15,11 +15,16 @@
     select, input { font-size: 15px; padding: 10px; width: 100%; box-sizing: border-box; margin: 6px 0; border: 1px solid #ccc; border-radius: 8px; }
     #status { text-align: center; padding: 40px 0; color: #888; }
     #bindScreen, #mainScreen { display: none; }
-    .status-row { display: flex; justify-content: space-between; padding: 8px 10px; border-bottom: 1px solid #eee; font-size: 14px; }
+    .status-row { padding: 8px 10px; border-bottom: 1px solid #eee; font-size: 14px; }
+    .status-row .row-top { display: flex; justify-content: space-between; }
+    .status-row .row-detail { margin-top: 3px; font-size: 12px; color: #888; display: flex; justify-content: flex-end; gap: 10px; }
     .status-row .s-paid { color: #06c755; font-weight: bold; }
     .status-row .s-unconfirmed { color: #d68a00; font-weight: bold; }
     .status-row .s-unpaid { color: #d33; font-weight: bold; }
+    .status-row .s-partial { color: #ff8c00; font-weight: bold; }
     #receiptResult { background: #f0fff4; border: 1px solid #06c755; border-radius: 10px; padding: 14px; margin-top: 10px; display: none; }
+    #receiptResult.partial { background: #fff8ec; border-color: #ff8c00; }
+    #receiptResult .r-note { font-weight: bold; }
 
     /* 三聯式收據列印樣式 */
     #printArea { display: none; }
@@ -56,7 +61,7 @@
     <h2>繳費狀況查詢</h2>
     <button class="secondary" onclick="loadStatus()">查詢本期繳費狀況</button>
     <label style="display:block; margin:8px 0; font-size:14px;">
-      <input type="checkbox" id="onlyUnpaid" checked onchange="renderStatus()"> 只顯示未結清（未銷帳/已繳未銷）
+      <input type="checkbox" id="onlyUnpaid" checked onchange="renderStatus()"> 只顯示未結清（未銷帳/已繳未銷/部分繳款）
     </label>
     <div id="statusList"></div>
 
@@ -74,8 +79,9 @@
       <div class="receipt-row"><span class="label">收據編號</span><span class="value" id="p-no-1"></span></div>
       <div class="receipt-row"><span class="label">繳費期別</span><span class="value" id="p-period-1"></span></div>
       <div class="receipt-row"><span class="label">房號</span><span class="value" id="p-room-1"></span></div>
-      <div class="receipt-row"><span class="label">金額</span><span class="value" id="p-amount-1"></span></div>
+      <div class="receipt-row"><span class="label">本次收款</span><span class="value" id="p-amount-1"></span></div>
       <div class="receipt-row"><span class="label">日期</span><span class="value" id="p-date-1"></span></div>
+      <div class="receipt-row"><span class="label">繳費狀態</span><span class="value" id="p-note-1"></span></div>
       <div class="receipt-sign"><span>開立人：管理員</span><span>簽章：__________</span></div>
     </div>
     <div class="receipt-copy">
@@ -83,8 +89,9 @@
       <div class="receipt-row"><span class="label">收據編號</span><span class="value" id="p-no-2"></span></div>
       <div class="receipt-row"><span class="label">繳費期別</span><span class="value" id="p-period-2"></span></div>
       <div class="receipt-row"><span class="label">房號</span><span class="value" id="p-room-2"></span></div>
-      <div class="receipt-row"><span class="label">金額</span><span class="value" id="p-amount-2"></span></div>
+      <div class="receipt-row"><span class="label">本次收款</span><span class="value" id="p-amount-2"></span></div>
       <div class="receipt-row"><span class="label">日期</span><span class="value" id="p-date-2"></span></div>
+      <div class="receipt-row"><span class="label">繳費狀態</span><span class="value" id="p-note-2"></span></div>
       <div class="receipt-sign"><span>開立人：管理員</span><span>簽章：__________</span></div>
     </div>
     <div class="receipt-copy">
@@ -92,8 +99,9 @@
       <div class="receipt-row"><span class="label">收據編號</span><span class="value" id="p-no-3"></span></div>
       <div class="receipt-row"><span class="label">繳費期別</span><span class="value" id="p-period-3"></span></div>
       <div class="receipt-row"><span class="label">房號</span><span class="value" id="p-room-3"></span></div>
-      <div class="receipt-row"><span class="label">金額</span><span class="value" id="p-amount-3"></span></div>
+      <div class="receipt-row"><span class="label">本次收款</span><span class="value" id="p-amount-3"></span></div>
       <div class="receipt-row"><span class="label">日期</span><span class="value" id="p-date-3"></span></div>
+      <div class="receipt-row"><span class="label">繳費狀態</span><span class="value" id="p-note-3"></span></div>
       <div class="receipt-sign"><span>開立人：管理員</span><span>簽章：__________</span></div>
     </div>
   </div>
@@ -268,10 +276,22 @@
         box.innerHTML = '<p>全部房號本期都已銷帳</p>';
         return;
       }
-      var clsMap = { 已銷帳: 's-paid', 已繳未銷: 's-unconfirmed', 未銷帳: 's-unpaid' };
+      var clsMap = { 已銷帳: 's-paid', 已繳未銷: 's-unconfirmed', 未銷帳: 's-unpaid', 部分繳款: 's-partial' };
       box.innerHTML = list.map(function (r) {
         var cls = clsMap[r.狀態] || 's-unpaid';
-        return '<div class="status-row"><span>' + r.房號 + ' ' + r.租戶姓名 + '</span><span class="' + cls + '">' + r.狀態 + '</span></div>';
+        var detail = '';
+        // 只有真的有金額資料（已收 > 0，或狀態是部分繳款/已銷帳）才顯示金額明細
+        if (r.應繳金額 !== undefined && r.應繳金額 !== null && (r.已收金額 > 0 || r.狀態 === '部分繳款')) {
+          detail = '<div class="row-detail">' +
+            '<span>已收 ' + r.已收金額 + ' 元</span>' +
+            '<span>應繳 ' + r.應繳金額 + ' 元</span>' +
+            (r.尚欠金額 > 0 ? '<span>尚欠 ' + r.尚欠金額 + ' 元</span>' : '') +
+            '</div>';
+        }
+        return '<div class="status-row">' +
+          '<div class="row-top"><span>' + r.房號 + ' ' + r.租戶姓名 + '</span><span class="' + cls + '">' + r.狀態 + '</span></div>' +
+          detail +
+          '</div>';
       }).join('');
     }
 
@@ -288,12 +308,20 @@
           return;
         }
         var period = res.receiptNo.split('-')[0];
+        var isPartial = res.狀態 === '部分繳款';
+        var note = isPartial
+          ? '部分繳款，尚欠 ' + res.尚欠金額 + ' 元'
+          : '已全額結清';
+
         var box = document.getElementById('receiptResult');
+        box.className = isPartial ? 'partial' : '';
         box.style.display = 'block';
         box.innerHTML = '<p>收款成功</p>' +
           '<p>收據編號：' + res.receiptNo + '</p>' +
           '<p>時間：' + res.date + '</p>' +
-          '<button onclick="printReceipt(\'' + res.receiptNo + '\',\'' + period + '\',\'' + room + '\',\'' + amount + '\',\'' + res.date + '\')">列印三聯收據</button>' +
+          '<p>本次收款：' + res.本次收款 + ' 元｜累計已收：' + res.累計已收 + ' 元' + (res.應繳金額 != null ? '｜應繳：' + res.應繳金額 + ' 元' : '') + '</p>' +
+          '<p class="r-note">' + note + '</p>' +
+          '<button onclick="printReceipt(\'' + res.receiptNo + '\',\'' + period + '\',\'' + room + '\',\'' + res.本次收款 + '\',\'' + res.date + '\',\'' + note + '\')">列印三聯收據</button>' +
           '<button class="secondary" onclick="location.reload()">完成，繼續下一筆</button>';
         document.getElementById('amountInput').value = '';
       }).catch(function (err) {
@@ -301,13 +329,14 @@
       });
     }
 
-    function printReceipt(no, period, room, amount, date) {
+    function printReceipt(no, period, room, amount, date, note) {
       for (var i = 1; i <= 3; i++) {
         document.getElementById('p-no-' + i).innerText = no;
         document.getElementById('p-period-' + i).innerText = period;
         document.getElementById('p-room-' + i).innerText = room;
         document.getElementById('p-amount-' + i).innerText = amount + ' 元';
         document.getElementById('p-date-' + i).innerText = date;
+        document.getElementById('p-note-' + i).innerText = note || '已全額結清';
       }
       window.print();
     }
