@@ -22,6 +22,7 @@
     .status-row .s-unconfirmed { color: #d68a00; font-weight: bold; }
     .status-row .s-unpaid { color: #d33; font-weight: bold; }
     .status-row .s-partial { color: #ff8c00; font-weight: bold; }
+    #roomDueInfo { font-size: 13px; color: #888; margin: -2px 0 6px; min-height: 16px; }
     #receiptResult { background: #f0fff4; border: 1px solid #06c755; border-radius: 10px; padding: 14px; margin-top: 10px; display: none; }
     #receiptResult.partial { background: #fff8ec; border-color: #ff8c00; }
     #receiptResult .r-note { font-weight: bold; }
@@ -66,7 +67,8 @@
     <div id="statusList"></div>
 
     <h2>現金收款登錄</h2>
-    <select id="roomSelect"></select>
+    <select id="roomSelect" onchange="showRoomDue()"></select>
+    <div id="roomDueInfo"></div>
     <input id="amountInput" type="number" placeholder="收款金額">
     <button onclick="submitCash()">確認收款並產生收據</button>
     <div id="receiptResult"></div>
@@ -232,6 +234,27 @@
         opt.innerText = r.房號 + ' ' + r.租戶姓名;
         select.appendChild(opt);
       });
+      showRoomDue(); // 選單載入完成後，先顯示第一個房號的狀況
+    }
+
+    function showRoomDue() {
+      var room = document.getElementById('roomSelect').value;
+      var info = document.getElementById('roomDueInfo');
+      if (!room) { info.innerText = ''; return; }
+      info.innerText = '查詢中…';
+      callApi('getPaymentStatus').then(function (list) {
+        var found = list.filter(function (r) { return r.房號 === room; })[0];
+        if (!found) { info.innerText = ''; return; }
+        if (found.應繳金額 == null) {
+          info.innerText = '本期尚未匯入這個房號的帳單金額';
+        } else if (found.狀態 === '已銷帳') {
+          info.innerText = '本期已結清（已收 ' + found.已收金額 + ' 元）';
+        } else {
+          info.innerText = '應繳 ' + found.應繳金額 + ' 元｜已收 ' + found.已收金額 + ' 元｜尚欠 ' + found.尚欠金額 + ' 元';
+        }
+      }).catch(function () {
+        info.innerText = '';
+      });
     }
 
     function shareBill(room, imageUrl) {
@@ -343,4 +366,3 @@
   </script>
 </body>
 </html>
-
