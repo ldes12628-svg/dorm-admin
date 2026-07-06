@@ -51,7 +51,6 @@
 
   <div id="mainScreen">
     <h2>本期繳費單</h2>
-    <select id="billRoomSelect" onchange="renderSelectedBill()"></select>
     <div id="billList"></div>
 
     <h2>繳費狀況查詢</h2>
@@ -202,32 +201,18 @@
     }
 
     function renderBills(bills) {
-      var select = document.getElementById('billRoomSelect');
       var list = document.getElementById('billList');
       if (bills.length === 0) {
-        select.innerHTML = '';
         list.innerHTML = '<p>本期尚未匯入繳費單</p>';
         return;
       }
-      select.innerHTML = bills.map(function (b, i) {
-        return '<option value="' + i + '">' + b.房號 + ' ' + b.租戶姓名 + '</option>';
+      list.innerHTML = bills.map(function (b) {
+        return '<div class="card">' +
+          '<h3>' + b.房號 + ' ' + b.租戶姓名 + '</h3>' +
+          '<p>電費：' + b.電費 + ' 元｜水費：' + b.水費 + ' 元｜應繳：' + b.應繳金額 + ' 元</p>' +
+          '<button onclick="shareBill(\'' + b.房號 + '\', \'' + (b.繳費單圖片網址 || '') + '\')">轉發給租戶</button>' +
+          '</div>';
       }).join('');
-      renderSelectedBill();
-    }
-
-    function renderSelectedBill() {
-      var select = document.getElementById('billRoomSelect');
-      var list = document.getElementById('billList');
-      if (allBills.length === 0) {
-        list.innerHTML = '';
-        return;
-      }
-      var b = allBills[Number(select.value)];
-      list.innerHTML = '<div class="card">' +
-        '<h3>' + b.房號 + ' ' + b.租戶姓名 + '</h3>' +
-        '<p>電費：' + b.電費 + ' 元｜水費：' + b.水費 + ' 元｜應繳：' + b.應繳金額 + ' 元</p>' +
-        '<button onclick="shareBill(\'' + b.房號 + '\', \'' + (b.繳費單圖片網址 || '') + '\')">轉發給租戶</button>' +
-        '</div>';
     }
 
     function renderRoomOptions(rooms) {
