@@ -20,6 +20,21 @@
     .status-row .s-unconfirmed { color: #d68a00; font-weight: bold; }
     .status-row .s-unpaid { color: #d33; font-weight: bold; }
     #receiptResult { background: #f0fff4; border: 1px solid #06c755; border-radius: 10px; padding: 14px; margin-top: 10px; display: none; }
+
+    /* 三聯式收據列印樣式 */
+    #printArea { display: none; }
+    @media print {
+      body * { visibility: hidden; }
+      #printArea, #printArea * { visibility: visible; }
+      #printArea { display: block; position: absolute; top: 0; left: 0; width: 100%; }
+      .receipt-copy { page-break-inside: avoid; border-bottom: 1px dashed #000; padding: 12px 16px; box-sizing: border-box; }
+      .receipt-copy:last-child { border-bottom: none; }
+      .receipt-title { font-size: 14px; font-weight: bold; display: flex; justify-content: space-between; margin-bottom: 6px; }
+      .receipt-row { display: flex; font-size: 12px; margin: 3px 0; }
+      .receipt-row .label { width: 70px; color: #333; }
+      .receipt-row .value { flex: 1; font-weight: bold; }
+      .receipt-sign { margin-top: 10px; font-size: 12px; display: flex; justify-content: space-between; }
+    }
   </style>
 </head>
 <body>
@@ -50,6 +65,37 @@
     <input id="amountInput" type="number" placeholder="收款金額">
     <button onclick="submitCash()">確認收款並產生收據</button>
     <div id="receiptResult"></div>
+  </div>
+
+  <!-- 以下區塊平常隱藏，只有按「列印收據」時，透過瀏覽器列印功能才會印出來 -->
+  <div id="printArea">
+    <div class="receipt-copy">
+      <div class="receipt-title"><span>啟乘工程有限公司 現金收據</span><span>存根聯</span></div>
+      <div class="receipt-row"><span class="label">收據編號</span><span class="value" id="p-no-1"></span></div>
+      <div class="receipt-row"><span class="label">繳費期別</span><span class="value" id="p-period-1"></span></div>
+      <div class="receipt-row"><span class="label">房號</span><span class="value" id="p-room-1"></span></div>
+      <div class="receipt-row"><span class="label">金額</span><span class="value" id="p-amount-1"></span></div>
+      <div class="receipt-row"><span class="label">日期</span><span class="value" id="p-date-1"></span></div>
+      <div class="receipt-sign"><span>開立人：管理員</span><span>簽章：__________</span></div>
+    </div>
+    <div class="receipt-copy">
+      <div class="receipt-title"><span>啟乘工程有限公司 現金收據</span><span>收據聯（交租戶）</span></div>
+      <div class="receipt-row"><span class="label">收據編號</span><span class="value" id="p-no-2"></span></div>
+      <div class="receipt-row"><span class="label">繳費期別</span><span class="value" id="p-period-2"></span></div>
+      <div class="receipt-row"><span class="label">房號</span><span class="value" id="p-room-2"></span></div>
+      <div class="receipt-row"><span class="label">金額</span><span class="value" id="p-amount-2"></span></div>
+      <div class="receipt-row"><span class="label">日期</span><span class="value" id="p-date-2"></span></div>
+      <div class="receipt-sign"><span>開立人：管理員</span><span>簽章：__________</span></div>
+    </div>
+    <div class="receipt-copy">
+      <div class="receipt-title"><span>啟乘工程有限公司 現金收據</span><span>報帳聯</span></div>
+      <div class="receipt-row"><span class="label">收據編號</span><span class="value" id="p-no-3"></span></div>
+      <div class="receipt-row"><span class="label">繳費期別</span><span class="value" id="p-period-3"></span></div>
+      <div class="receipt-row"><span class="label">房號</span><span class="value" id="p-room-3"></span></div>
+      <div class="receipt-row"><span class="label">金額</span><span class="value" id="p-amount-3"></span></div>
+      <div class="receipt-row"><span class="label">日期</span><span class="value" id="p-date-3"></span></div>
+      <div class="receipt-sign"><span>開立人：管理員</span><span>簽章：__________</span></div>
+    </div>
   </div>
 
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -133,17 +179,17 @@
       loadRooms();
     }
 
-function loadRooms() {
-     callApi('getAllRooms').then(function (rooms) {
-       renderRoomOptions(rooms);
-     }).catch(function (err) {
-       var select = document.getElementById('roomSelect');
-       select.innerHTML = '';
-       var opt = document.createElement('option');
-       opt.innerText = '房號載入失敗：' + err.message;
-       select.appendChild(opt);
-     });
-   }
+    function loadRooms() {
+      callApi('getAllRooms').then(function (rooms) {
+        renderRoomOptions(rooms);
+      }).catch(function (err) {
+        var select = document.getElementById('roomSelect');
+        select.innerHTML = '';
+        var opt = document.createElement('option');
+        opt.innerText = '房號載入失敗：' + err.message;
+        select.appendChild(opt);
+      });
+    }
 
     function loadBills() {
       callApi('getMonthlyBills').then(function (bills) {
@@ -241,16 +287,29 @@ function loadRooms() {
           alert(res.message);
           return;
         }
+        var period = res.receiptNo.split('-')[0];
         var box = document.getElementById('receiptResult');
         box.style.display = 'block';
         box.innerHTML = '<p>收款成功</p>' +
           '<p>收據編號：' + res.receiptNo + '</p>' +
           '<p>時間：' + res.date + '</p>' +
+          '<button onclick="printReceipt(\'' + res.receiptNo + '\',\'' + period + '\',\'' + room + '\',\'' + amount + '\',\'' + res.date + '\')">列印三聯收據</button>' +
           '<button class="secondary" onclick="location.reload()">完成，繼續下一筆</button>';
         document.getElementById('amountInput').value = '';
       }).catch(function (err) {
         alert('登錄失敗：' + err.message);
       });
+    }
+
+    function printReceipt(no, period, room, amount, date) {
+      for (var i = 1; i <= 3; i++) {
+        document.getElementById('p-no-' + i).innerText = no;
+        document.getElementById('p-period-' + i).innerText = period;
+        document.getElementById('p-room-' + i).innerText = room;
+        document.getElementById('p-amount-' + i).innerText = amount + ' 元';
+        document.getElementById('p-date-' + i).innerText = date;
+      }
+      window.print();
     }
   </script>
 </body>
