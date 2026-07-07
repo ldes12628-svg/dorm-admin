@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>宿舍管理員</title>
+  <title>81宿舍管理系統</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
     * { box-sizing: border-box; }
@@ -80,6 +80,7 @@
       border-color: #06c755;
       box-shadow: 0 0 0 3px rgba(6,199,85,0.12);
     }
+    input.filled { border-color: #27ae60; background: #f0fff4; }
 
     label.checkline {
       display: flex;
@@ -139,8 +140,23 @@
     .expense-row .e-amount { font-weight: 700; color: #e0483c; white-space: nowrap; }
     #expenseTotal { text-align: right; font-weight: 700; margin-top: 10px; font-size: 14px; color: #333; }
 
-    .msg-ok { color: #06a648; font-weight: 700; font-size: 13.5px; }
-    .msg-err { color: #d33; font-weight: 700; font-size: 13.5px; }
+    .msg-ok { color: #06a648; font-weight: 700; font-size: 13.5px; white-space: pre-line; }
+    .msg-err { color: #d33; font-weight: 700; font-size: 13.5px; white-space: pre-line; }
+
+    #meterProgress {
+      font-size: 13px;
+      color: #2c7be5;
+      font-weight: 700;
+      margin-bottom: 8px;
+      position: sticky;
+      top: 0;
+      background: #fff;
+      z-index: 5;
+      padding: 4px 0;
+    }
+    .meter-card { border-left: 4px solid transparent; }
+    .meter-card.done { border-left-color: #27ae60; }
+    .meter-tag { font-size: 11px; color: #27ae60; margin-top: 4px; min-height: 14px; }
 
     #printArea { display: none; }
     @media print {
@@ -159,7 +175,7 @@
 </head>
 <body>
 
-  <div class="topbar">🏠 宿舍管理員</div>
+  <div class="topbar">🏠 81宿舍管理系統</div>
 
   <div class="container">
     <div id="status">載入中…</div>
@@ -177,6 +193,16 @@
     </div>
 
     <div id="mainScreen">
+      <section>
+        <h2>⚡ 用電抄表</h2>
+        <div class="card">
+          <div id="meterProgress"></div>
+          <div id="meterList"></div>
+          <button onclick="submitMeterReadings()">產生並寄出電費 Excel</button>
+          <p id="meterMsg"></p>
+        </div>
+      </section>
+
       <section>
         <h2>🧾 繳費單查詢</h2>
         <select id="billPeriodSelect" onchange="loadBills()"></select>
@@ -273,13 +299,18 @@
   <script>
     var LIFF_ID = '2010574364-GyqCDEpu'; // 替換成 LINE Developers Console 拿到的 LIFF ID
 
-    // 換成你的 Apps Script 部署網址（結尾是 /exec）
+    // 宿舍管理系統本身的 API（完全不變）
     var API_BASE = 'https://script.google.com/macros/s/AKfycbyJ-r3ocN9riXeskpYDTJyG5cVLVJ2tmZzjxX-ljFXujoRex0AdLp7jpPOKfhAt-Bk/exec';
+
+    // 抄表系統的 API（獨立的另一個 Apps Script 專案，資料庫互不相通）
+    var METER_API_BASE = 'https://script.google.com/macros/s/AKfycbzHvJEwrhzF5qwQlI3_n1ZEnJRs3o0zr08LbIQoQtanL0uL7-Jp1pcHTyqB4psX3hOMBg/exec';
+    var METER_DRAFT_KEY = 'meter_draft_v1';
 
     var userId = null;
     var allBills = [];
     var allStatus = [];
     var periodOptions = [];
+    var meterRooms = [];
 
     window.onerror = function (msg, url, line) {
       document.getElementById('status').style.display = 'block';
@@ -349,6 +380,7 @@
       document.getElementById('mainScreen').style.display = 'block';
       loadPeriodOptions();
       loadRooms();
+      loadMeterRooms();
     }
 
     function loadPeriodOptions() {
@@ -647,6 +679,132 @@
       }).catch(function (err) {
         msg.className = 'msg-err';
         msg.innerText = '新增失敗：' + err.message;
+      });
+    }
+
+    // ---------- 用電抄表（呼叫獨立的抄表系統 API） ----------
+
+    function loadMeterRooms() {
+      document.getElementById('meterList').innerHTML = '載入中…';
+      fetch(METER_API_BASE + '?action=getRooms').then(function (res) {
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res.json();
+      }).then(function (rooms) {
+        meterRooms = rooms;
+        renderMeterRooms();
+      }).catch(function (err) {
+        document.getElementById('meterList').innerHTML = '<p style="color:#c00;">載入失敗：' + err.message + '</p>';
+      });
+    }
+
+    function renderMeterRooms() {
+      var box = document.getElementById('meterList');
+      if (meterRooms.length === 0) {
+        box.innerHTML = '<p>沒有讀到房間資料</p>';
+        return;
+      }
+      var draft = {};
+      try { draft = JSON.parse(localStorage.getItem(METER_DRAFT_KEY) || '{}'); } catch (e) { draft = {}; }
+
+      box.innerHTML = meterRooms.map(function (r) {
+        var val = draft[r.房號] !== undefined ? draft[r.房號] : '';
+        var filledClass = val !== '' ? ' filled' : '';
+        var doneClass = val !== '' ? ' done' : '';
+        return '<div class="card meter-card' + doneClass + '" id="meter_card_' + r.房號 + '" style="margin-bottom:8px;">' +
+          '<h3>' + r.房號 + (r.房客姓名 ? '　' + r.房客姓名 : '') + '</h3>' +
+          '<p>上期度數：' + r.上期度數 + '</p>' +
+          '<input type="number" inputmode="numeric" class="' + filledClass.trim() + '" placeholder="輸入本期度數" value="' + val + '" ' +
+          'data-room="' + r.房號 + '" data-last="' + r.上期度數 + '" oninput="onMeterInput(this)">' +
+          '<div class="meter-tag" id="meter_tag_' + r.房號 + '">' + (val !== '' ? '✓ 已填：' + val + ' 度' : '') + '</div>' +
+          '</div>';
+      }).join('');
+      updateMeterProgress();
+    }
+
+    function onMeterInput(inp) {
+      var room = inp.getAttribute('data-room');
+      var card = document.getElementById('meter_card_' + room);
+      var tag = document.getElementById('meter_tag_' + room);
+      if (inp.value !== '') {
+        inp.classList.add('filled');
+        card.classList.add('done');
+        tag.innerText = '✓ 已填：' + inp.value + ' 度';
+      } else {
+        inp.classList.remove('filled');
+        card.classList.remove('done');
+        tag.innerText = '';
+      }
+      saveMeterDraft();
+      updateMeterProgress();
+    }
+
+    function saveMeterDraft() {
+      var draft = {};
+      document.querySelectorAll('#meterList input[type=number]').forEach(function (inp) {
+        if (inp.value !== '') draft[inp.getAttribute('data-room')] = inp.value;
+      });
+      try { localStorage.setItem(METER_DRAFT_KEY, JSON.stringify(draft)); } catch (e) {}
+    }
+
+    function updateMeterProgress() {
+      var inputs = document.querySelectorAll('#meterList input[type=number]');
+      var filled = 0;
+      inputs.forEach(function (inp) { if (inp.value !== '') filled++; });
+      document.getElementById('meterProgress').innerText = '已填 ' + filled + ' / ' + inputs.length + ' 間';
+    }
+
+    function submitMeterReadings() {
+      var inputs = document.querySelectorAll('#meterList input[type=number]');
+      var readings = [];
+      var abnormal = [];
+      inputs.forEach(function (inp) {
+        if (inp.value === '') return;
+        var room = inp.getAttribute('data-room');
+        var last = Number(inp.getAttribute('data-last')) || 0;
+        var cur = Number(inp.value);
+        var usage = cur - last;
+        if (usage < 0) abnormal.push(room + '（本期' + cur + ' 小於上期' + last + '，用電量為負數）');
+        else if (usage > 500) abnormal.push(room + '（用電量達 ' + usage + ' 度，請確認）');
+        readings.push({ room: room, reading: cur });
+      });
+      if (readings.length === 0) {
+        alert('請至少輸入一間房間的本期度數');
+        return;
+      }
+      if (abnormal.length > 0) {
+        var go = confirm('以下房間數字可能異常，請再次確認：\n' + abnormal.join('\n') + '\n\n確定要照這些數字送出嗎？');
+        if (!go) return;
+      }
+
+      var msg = document.getElementById('meterMsg');
+      msg.className = '';
+      msg.innerText = '處理中，請稍候…';
+
+      fetch(METER_API_BASE, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ readings: readings })
+      }).then(function (res) {
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res.json();
+      }).then(function (result) {
+        if (!result.success) {
+          msg.className = 'msg-err';
+          msg.innerText = '登錄失敗：' + result.message;
+          return;
+        }
+        try { localStorage.removeItem(METER_DRAFT_KEY); } catch (e) {}
+        msg.className = 'msg-ok';
+        var text = '已成功產生並寄出 Excel！共 ' + result.count + ' 戶（期別 ' + result.period + '）。';
+        if (result.abnormalRooms && result.abnormalRooms.length > 0) {
+          text += '\n⚠ ' + result.abnormalRooms.length + ' 筆用電量異常，已列在 Email 內容中，請特別檢查。';
+        }
+        msg.innerText = text;
+        document.getElementById('meterList').innerHTML = '';
+        document.getElementById('meterProgress').innerText = '';
+      }).catch(function (err) {
+        msg.className = 'msg-err';
+        msg.innerText = '送出失敗：' + err.message;
       });
     }
   </script>
