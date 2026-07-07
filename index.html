@@ -63,7 +63,8 @@
   </div>
 
   <div id="mainScreen">
-    <h2>本期繳費單</h2>
+    <h2>繳費單查詢</h2>
+    <select id="billPeriodSelect" onchange="loadBills()"></select>
     <div id="billList"></div>
 
     <h2>繳費狀況查詢</h2>
@@ -216,7 +217,6 @@
     function showMain() {
       document.getElementById('mainScreen').style.display = 'block';
       loadPeriodOptions();
-      loadBills();
       loadRooms();
     }
 
@@ -225,8 +225,9 @@
         periodOptions = options;
         fillPeriodSelect('statusPeriodSelect', options);
         fillPeriodSelect('expensePeriodSelect', options);
+        fillPeriodSelect('billPeriodSelect', options);
         loadStatus();
-        // 支出日期預設今天
+        loadBills();
         var today = new Date();
         var y = today.getFullYear(), m = String(today.getMonth() + 1).padStart(2, '0'), d = String(today.getDate()).padStart(2, '0');
         document.getElementById('expenseDate').value = y + '-' + m + '-' + d;
@@ -259,7 +260,8 @@
     }
 
     function loadBills() {
-      callApi('getMonthlyBills').then(function (bills) {
+      var period = document.getElementById('billPeriodSelect').value;
+      callApi('getMonthlyBills', { period: period }).then(function (bills) {
         allBills = bills;
         renderBills(bills);
       }).catch(function (err) {
@@ -270,7 +272,7 @@
     function renderBills(bills) {
       var list = document.getElementById('billList');
       if (bills.length === 0) {
-        list.innerHTML = '<p>本期尚未匯入繳費單</p>';
+        list.innerHTML = '<p>這期尚未匯入繳費單</p>';
         return;
       }
       list.innerHTML = bills.map(function (b) {
@@ -510,7 +512,7 @@
         document.getElementById('tenantDeposit').value = '';
         document.getElementById('tenantMoveIn').value = '';
         document.getElementById('tenantPhone').value = '';
-        loadRooms(); // 讓現金收款登錄的房號下拉選單也更新
+        loadRooms();
       }).catch(function (err) {
         msg.className = 'msg-err';
         msg.innerText = '新增失敗：' + err.message;
