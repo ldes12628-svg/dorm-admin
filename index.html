@@ -12,7 +12,7 @@
     .card p { margin: 2px 0; font-size: 13px; color: #666; }
     button { font-size: 15px; padding: 10px 14px; border-radius: 8px; border: none; background: #06c755; color: #fff; margin-top: 6px; }
     button.secondary { background: #eee; color: #333; }
-    select, input { font-size: 15px; padding: 10px; width: 100%; box-sizing: border-box; margin: 6px 0; border: 1px solid #ccc; border-radius: 8px; }
+    select, input, textarea { font-size: 15px; padding: 10px; width: 100%; box-sizing: border-box; margin: 6px 0; border: 1px solid #ccc; border-radius: 8px; font-family: inherit; }
     #status { text-align: center; padding: 40px 0; color: #888; }
     #bindScreen, #mainScreen { display: none; }
     .status-row { padding: 8px 10px; border-bottom: 1px solid #eee; font-size: 14px; }
@@ -26,6 +26,13 @@
     #receiptResult { background: #f0fff4; border: 1px solid #06c755; border-radius: 10px; padding: 14px; margin-top: 10px; display: none; }
     #receiptResult.partial { background: #fff8ec; border-color: #ff8c00; }
     #receiptResult .r-note { font-weight: bold; }
+    .expense-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #eee; font-size: 13px; }
+    .expense-row .e-item { color: #333; }
+    .expense-row .e-note { color: #999; font-size: 12px; }
+    .expense-row .e-amount { font-weight: bold; color: #d33; }
+    #expenseTotal { text-align: right; font-weight: bold; margin-top: 8px; font-size: 14px; }
+    .msg-ok { color: #06c755; font-weight: bold; font-size: 14px; }
+    .msg-err { color: #c00; font-weight: bold; font-size: 14px; }
 
     /* 三聯式收據列印樣式 */
     #printArea { display: none; }
@@ -60,7 +67,7 @@
     <div id="billList"></div>
 
     <h2>繳費狀況查詢</h2>
-    <button class="secondary" onclick="loadStatus()">查詢本期繳費狀況</button>
+    <select id="statusPeriodSelect" onchange="loadStatus()"></select>
     <label style="display:block; margin:8px 0; font-size:14px;">
       <input type="checkbox" id="onlyUnpaid" checked onchange="renderStatus()"> 只顯示未結清（未銷帳/已繳未銷/部分繳款）
     </label>
@@ -72,6 +79,28 @@
     <input id="amountInput" type="number" placeholder="收款金額">
     <button onclick="submitCash()">確認收款並產生收據</button>
     <div id="receiptResult"></div>
+
+    <h2>支出登錄</h2>
+    <select id="expensePeriodSelect"></select>
+    <input id="expenseDate" type="date">
+    <input id="expenseItem" placeholder="支出項目（例如：水電修繕）">
+    <input id="expenseAmount" type="number" placeholder="金額">
+    <textarea id="expenseNote" placeholder="備註（選填）" rows="2"></textarea>
+    <button onclick="submitExpense()">登錄支出</button>
+    <p id="expenseMsg"></p>
+    <button class="secondary" onclick="loadExpenses()">查詢本期支出</button>
+    <div id="expenseList"></div>
+    <div id="expenseTotal"></div>
+
+    <h2>新增租客</h2>
+    <input id="tenantRoom" placeholder="房號（例如：1AB）">
+    <input id="tenantName" placeholder="租戶姓名">
+    <input id="tenantRent" type="number" placeholder="房屋租金">
+    <input id="tenantDeposit" type="number" placeholder="押金">
+    <input id="tenantMoveIn" type="date">
+    <input id="tenantPhone" placeholder="手機號碼">
+    <button onclick="submitTenant()">新增租客</button>
+    <p id="tenantMsg"></p>
   </div>
 
   <!-- 以下區塊平常隱藏，只有按「列印收據」時，透過瀏覽器列印功能才會印出來 -->
@@ -118,6 +147,7 @@
     var userId = null;
     var allBills = [];
     var allStatus = [];
+    var periodOptions = [];
 
     window.onerror = function (msg, url, line) {
       document.getElementById('status').style.display = 'block';
@@ -185,8 +215,35 @@
 
     function showMain() {
       document.getElementById('mainScreen').style.display = 'block';
+      loadPeriodOptions();
       loadBills();
       loadRooms();
+    }
+
+    function loadPeriodOptions() {
+      callApi('getPeriodOptions').then(function (options) {
+        periodOptions = options;
+        fillPeriodSelect('statusPeriodSelect', options);
+        fillPeriodSelect('expensePeriodSelect', options);
+        loadStatus();
+        // 支出日期預設今天
+        var today = new Date();
+        var y = today.getFullYear(), m = String(today.getMonth() + 1).padStart(2, '0'), d = String(today.getDate()).padStart(2, '0');
+        document.getElementById('expenseDate').value = y + '-' + m + '-' + d;
+      }).catch(function (err) {
+        document.getElementById('statusList').innerHTML = '<p style="color:#c00;">期別載入失敗：' + err.message + '</p>';
+      });
+    }
+
+    function fillPeriodSelect(selectId, options) {
+      var select = document.getElementById(selectId);
+      select.innerHTML = '';
+      options.forEach(function (o) {
+        var opt = document.createElement('option');
+        opt.value = o.period;
+        opt.innerText = o.label;
+        select.appendChild(opt);
+      });
     }
 
     function loadRooms() {
@@ -234,7 +291,7 @@
         opt.innerText = r.房號 + ' ' + r.租戶姓名;
         select.appendChild(opt);
       });
-      showRoomDue(); // 選單載入完成後，先顯示第一個房號的狀況
+      showRoomDue();
     }
 
     function showRoomDue() {
@@ -278,8 +335,9 @@
     }
 
     function loadStatus() {
+      var period = document.getElementById('statusPeriodSelect').value;
       document.getElementById('statusList').innerHTML = '查詢中…';
-      callApi('getPaymentStatus').then(function (list) {
+      callApi('getPaymentStatus', { period: period }).then(function (list) {
         allStatus = list;
         renderStatus();
       }).catch(function (err) {
@@ -296,14 +354,13 @@
         return;
       }
       if (list.length === 0) {
-        box.innerHTML = '<p>全部房號本期都已銷帳</p>';
+        box.innerHTML = '<p>這期全部房號都已銷帳</p>';
         return;
       }
       var clsMap = { 已銷帳: 's-paid', 已繳未銷: 's-unconfirmed', 未銷帳: 's-unpaid', 部分繳款: 's-partial' };
       box.innerHTML = list.map(function (r) {
         var cls = clsMap[r.狀態] || 's-unpaid';
         var detail = '';
-        // 只有真的有金額資料（已收 > 0，或狀態是部分繳款/已銷帳）才顯示金額明細
         if (r.應繳金額 !== undefined && r.應繳金額 !== null && (r.已收金額 > 0 || r.狀態 === '部分繳款')) {
           detail = '<div class="row-detail">' +
             '<span>已收 ' + r.已收金額 + ' 元</span>' +
@@ -363,7 +420,102 @@
       }
       window.print();
     }
+
+    function submitExpense() {
+      var period = document.getElementById('expensePeriodSelect').value;
+      var date = document.getElementById('expenseDate').value;
+      var item = document.getElementById('expenseItem').value.trim();
+      var amount = document.getElementById('expenseAmount').value;
+      var note = document.getElementById('expenseNote').value.trim();
+      var msg = document.getElementById('expenseMsg');
+
+      if (!item || !amount) {
+        msg.className = 'msg-err';
+        msg.innerText = '請輸入項目名稱與金額';
+        return;
+      }
+
+      callApi('submitExpense', { period: period, date: date, item: item, amount: amount, note: note, userId: userId }).then(function (res) {
+        if (!res.success) {
+          msg.className = 'msg-err';
+          msg.innerText = res.message;
+          return;
+        }
+        msg.className = 'msg-ok';
+        msg.innerText = '登錄成功：' + res.item + ' ' + res.amount + ' 元';
+        document.getElementById('expenseItem').value = '';
+        document.getElementById('expenseAmount').value = '';
+        document.getElementById('expenseNote').value = '';
+        loadExpenses();
+      }).catch(function (err) {
+        msg.className = 'msg-err';
+        msg.innerText = '登錄失敗：' + err.message;
+      });
+    }
+
+    function loadExpenses() {
+      var period = document.getElementById('expensePeriodSelect').value;
+      var box = document.getElementById('expenseList');
+      var totalBox = document.getElementById('expenseTotal');
+      box.innerHTML = '查詢中…';
+      totalBox.innerText = '';
+      callApi('getExpenses', { period: period }).then(function (res) {
+        if (res.items.length === 0) {
+          box.innerHTML = '<p>這期尚無支出紀錄</p>';
+          totalBox.innerText = '';
+          return;
+        }
+        box.innerHTML = res.items.map(function (e) {
+          return '<div class="expense-row">' +
+            '<div><div class="e-item">' + e.日期 + ' ' + e.項目 + '</div>' +
+            (e.備註 ? '<div class="e-note">' + e.備註 + '</div>' : '') + '</div>' +
+            '<div class="e-amount">' + e.金額 + ' 元</div>' +
+            '</div>';
+        }).join('');
+        totalBox.innerText = '本期支出合計：' + res.total + ' 元';
+      }).catch(function (err) {
+        box.innerHTML = '<p style="color:#c00;">查詢失敗：' + err.message + '</p>';
+      });
+    }
+
+    function submitTenant() {
+      var room = document.getElementById('tenantRoom').value.trim();
+      var name = document.getElementById('tenantName').value.trim();
+      var rent = document.getElementById('tenantRent').value;
+      var deposit = document.getElementById('tenantDeposit').value;
+      var moveIn = document.getElementById('tenantMoveIn').value;
+      var phone = document.getElementById('tenantPhone').value.trim();
+      var msg = document.getElementById('tenantMsg');
+
+      if (!room || !name) {
+        msg.className = 'msg-err';
+        msg.innerText = '請輸入房號與租戶姓名';
+        return;
+      }
+
+      callApi('addTenant', {
+        room: room, name: name, rent: rent, deposit: deposit,
+        moveInDate: moveIn, phone: phone, userId: userId
+      }).then(function (res) {
+        if (!res.success) {
+          msg.className = 'msg-err';
+          msg.innerText = res.message;
+          return;
+        }
+        msg.className = 'msg-ok';
+        msg.innerText = '新增成功：' + res.room + ' ' + res.name;
+        document.getElementById('tenantRoom').value = '';
+        document.getElementById('tenantName').value = '';
+        document.getElementById('tenantRent').value = '';
+        document.getElementById('tenantDeposit').value = '';
+        document.getElementById('tenantMoveIn').value = '';
+        document.getElementById('tenantPhone').value = '';
+        loadRooms(); // 讓現金收款登錄的房號下拉選單也更新
+      }).catch(function (err) {
+        msg.className = 'msg-err';
+        msg.innerText = '新增失敗：' + err.message;
+      });
+    }
   </script>
 </body>
 </html>
-
