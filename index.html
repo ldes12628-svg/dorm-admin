@@ -5,36 +5,143 @@
   <title>宿舍管理員</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
-    body { font-family: -apple-system, "PingFang TC", "Microsoft JhengHei", sans-serif; padding: 16px; max-width: 480px; margin: 0 auto; color: #222; }
-    h2 { font-size: 18px; margin: 20px 0 10px; }
-    .card { border: 1px solid #ddd; border-radius: 10px; padding: 14px; margin-bottom: 10px; }
-    .card h3 { margin: 0 0 6px; font-size: 15px; }
-    .card p { margin: 2px 0; font-size: 13px; color: #666; }
-    button { font-size: 15px; padding: 10px 14px; border-radius: 8px; border: none; background: #06c755; color: #fff; margin-top: 6px; }
-    button.secondary { background: #eee; color: #333; }
-    select, input, textarea { font-size: 15px; padding: 10px; width: 100%; box-sizing: border-box; margin: 6px 0; border: 1px solid #ccc; border-radius: 8px; font-family: inherit; }
-    #status { text-align: center; padding: 40px 0; color: #888; }
-    #bindScreen, #mainScreen { display: none; }
-    .status-row { padding: 8px 10px; border-bottom: 1px solid #eee; font-size: 14px; }
-    .status-row .row-top { display: flex; justify-content: space-between; }
-    .status-row .row-detail { margin-top: 3px; font-size: 12px; color: #888; display: flex; justify-content: flex-end; gap: 10px; }
-    .status-row .s-paid { color: #06c755; font-weight: bold; }
-    .status-row .s-unconfirmed { color: #d68a00; font-weight: bold; }
-    .status-row .s-unpaid { color: #d33; font-weight: bold; }
-    .status-row .s-partial { color: #ff8c00; font-weight: bold; }
-    #roomDueInfo { font-size: 13px; color: #888; margin: -2px 0 6px; min-height: 16px; }
-    #receiptResult { background: #f0fff4; border: 1px solid #06c755; border-radius: 10px; padding: 14px; margin-top: 10px; display: none; }
-    #receiptResult.partial { background: #fff8ec; border-color: #ff8c00; }
-    #receiptResult .r-note { font-weight: bold; }
-    .expense-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #eee; font-size: 13px; }
-    .expense-row .e-item { color: #333; }
-    .expense-row .e-note { color: #999; font-size: 12px; }
-    .expense-row .e-amount { font-weight: bold; color: #d33; }
-    #expenseTotal { text-align: right; font-weight: bold; margin-top: 8px; font-size: 14px; }
-    .msg-ok { color: #06c755; font-weight: bold; font-size: 14px; }
-    .msg-err { color: #c00; font-weight: bold; font-size: 14px; }
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, "PingFang TC", "Microsoft JhengHei", sans-serif;
+      background: #f4f5f7;
+      color: #1c1c1e;
+      margin: 0;
+      padding: 0 0 40px;
+    }
+    .container { max-width: 480px; margin: 0 auto; padding: 0 16px; }
 
-    /* 三聯式收據列印樣式 */
+    .topbar {
+      background: linear-gradient(135deg, #06c755, #05a648);
+      color: #fff;
+      padding: 18px 16px;
+      font-size: 17px;
+      font-weight: 700;
+      text-align: center;
+      letter-spacing: 1px;
+      box-shadow: 0 2px 8px rgba(6,199,85,0.25);
+    }
+
+    section { margin-top: 22px; }
+    h2 {
+      font-size: 15px;
+      font-weight: 700;
+      color: #444;
+      margin: 0 0 10px;
+      padding-bottom: 6px;
+      border-bottom: 2px solid #e5e7eb;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .card {
+      background: #fff;
+      border: 1px solid #eee;
+      border-radius: 14px;
+      padding: 14px 16px;
+      margin-bottom: 10px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    }
+    .card h3 { margin: 0 0 6px; font-size: 15px; font-weight: 700; }
+    .card p { margin: 2px 0; font-size: 13px; color: #777; }
+
+    button {
+      font-size: 15px;
+      font-weight: 600;
+      padding: 11px 16px;
+      border-radius: 10px;
+      border: none;
+      background: #06c755;
+      color: #fff;
+      margin-top: 8px;
+      width: 100%;
+      transition: opacity 0.15s;
+    }
+    button:active { opacity: 0.75; }
+    button.secondary { background: #eceef1; color: #444; }
+
+    select, input, textarea {
+      font-size: 15px;
+      padding: 11px 12px;
+      width: 100%;
+      margin: 6px 0;
+      border: 1px solid #dcdfe4;
+      border-radius: 10px;
+      font-family: inherit;
+      background: #fff;
+    }
+    select:focus, input:focus, textarea:focus {
+      outline: none;
+      border-color: #06c755;
+      box-shadow: 0 0 0 3px rgba(6,199,85,0.12);
+    }
+
+    label.checkline {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin: 10px 0;
+      font-size: 13.5px;
+      color: #666;
+    }
+
+    #status { text-align: center; padding: 60px 0; color: #999; font-size: 14px; }
+    #bindScreen, #mainScreen { display: none; }
+
+    .status-row {
+      background: #fff;
+      border: 1px solid #eee;
+      border-radius: 12px;
+      padding: 10px 14px;
+      margin-bottom: 8px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+    }
+    .status-row .row-top { display: flex; justify-content: space-between; align-items: center; font-size: 14px; font-weight: 500; }
+    .status-row .row-detail { margin-top: 4px; font-size: 12px; color: #999; display: flex; justify-content: flex-end; gap: 10px; }
+
+    .badge { padding: 3px 10px; border-radius: 20px; font-size: 12.5px; font-weight: 700; }
+    .s-paid { background: #e6f9ee; color: #06a648; }
+    .s-unconfirmed { background: #fff4e0; color: #d68a00; }
+    .s-unpaid { background: #fdeaea; color: #d33; }
+    .s-partial { background: #fff0e0; color: #ff8c00; }
+
+    #roomDueInfo { font-size: 13px; color: #888; margin: -2px 0 8px; min-height: 16px; padding-left: 2px; }
+
+    #receiptResult {
+      background: #f0fff4;
+      border: 1px solid #b7ebc6;
+      border-radius: 14px;
+      padding: 16px;
+      margin-top: 12px;
+      display: none;
+      font-size: 13.5px;
+      line-height: 1.7;
+    }
+    #receiptResult.partial { background: #fff8ec; border-color: #ffd9a0; }
+    #receiptResult .r-note { font-weight: 700; font-size: 14.5px; margin: 6px 0; }
+
+    .expense-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      padding: 10px 0;
+      border-bottom: 1px solid #f0f0f0;
+      font-size: 13.5px;
+    }
+    .expense-row:last-child { border-bottom: none; }
+    .expense-row .e-item { color: #333; font-weight: 500; }
+    .expense-row .e-note { color: #aaa; font-size: 12px; margin-top: 2px; }
+    .expense-row .e-amount { font-weight: 700; color: #e0483c; white-space: nowrap; }
+    #expenseTotal { text-align: right; font-weight: 700; margin-top: 10px; font-size: 14px; color: #333; }
+
+    .msg-ok { color: #06a648; font-weight: 700; font-size: 13.5px; }
+    .msg-err { color: #d33; font-weight: 700; font-size: 13.5px; }
+
     #printArea { display: none; }
     @media print {
       body * { visibility: hidden; }
@@ -52,56 +159,80 @@
 </head>
 <body>
 
-  <div id="status">載入中…</div>
+  <div class="topbar">🏠 宿舍管理員</div>
 
-  <div id="bindScreen">
-    <h2>管理員綁定</h2>
-    <p>請輸入公司給你的驗證碼完成第一次綁定：</p>
-    <input id="bindCode" placeholder="輸入驗證碼">
-    <button onclick="doBind()">送出</button>
-    <p id="bindMsg" style="color:#c00;"></p>
-  </div>
+  <div class="container">
+    <div id="status">載入中…</div>
 
-  <div id="mainScreen">
-    <h2>繳費單查詢</h2>
-    <select id="billPeriodSelect" onchange="loadBills()"></select>
-    <div id="billList"></div>
+    <div id="bindScreen">
+      <section>
+        <h2>🔑 管理員綁定</h2>
+        <div class="card">
+          <p>請輸入公司給你的驗證碼完成第一次綁定：</p>
+          <input id="bindCode" placeholder="輸入驗證碼">
+          <button onclick="doBind()">送出</button>
+          <p id="bindMsg" style="color:#c00; margin-top:8px;"></p>
+        </div>
+      </section>
+    </div>
 
-    <h2>繳費狀況查詢</h2>
-    <select id="statusPeriodSelect" onchange="loadStatus()"></select>
-    <label style="display:block; margin:8px 0; font-size:14px;">
-      <input type="checkbox" id="onlyUnpaid" checked onchange="renderStatus()"> 只顯示未結清（未銷帳/已繳未銷/部分繳款）
-    </label>
-    <div id="statusList"></div>
+    <div id="mainScreen">
+      <section>
+        <h2>🧾 繳費單查詢</h2>
+        <select id="billPeriodSelect" onchange="loadBills()"></select>
+        <div id="billList"></div>
+      </section>
 
-    <h2>現金收款登錄</h2>
-    <select id="roomSelect" onchange="showRoomDue()"></select>
-    <div id="roomDueInfo"></div>
-    <input id="amountInput" type="number" placeholder="收款金額">
-    <button onclick="submitCash()">確認收款並產生收據</button>
-    <div id="receiptResult"></div>
+      <section>
+        <h2>📊 繳費狀況查詢</h2>
+        <select id="statusPeriodSelect" onchange="loadStatus()"></select>
+        <label class="checkline">
+          <input type="checkbox" id="onlyUnpaid" checked onchange="renderStatus()" style="width:auto; margin:0;"> 只顯示未結清（未銷帳/已繳未銷/部分繳款）
+        </label>
+        <div id="statusList"></div>
+      </section>
 
-    <h2>支出登錄</h2>
-    <select id="expensePeriodSelect"></select>
-    <input id="expenseDate" type="date">
-    <input id="expenseItem" placeholder="支出項目（例如：水電修繕）">
-    <input id="expenseAmount" type="number" placeholder="金額">
-    <textarea id="expenseNote" placeholder="備註（選填）" rows="2"></textarea>
-    <button onclick="submitExpense()">登錄支出</button>
-    <p id="expenseMsg"></p>
-    <button class="secondary" onclick="loadExpenses()">查詢本期支出</button>
-    <div id="expenseList"></div>
-    <div id="expenseTotal"></div>
+      <section>
+        <h2>💵 現金收款登錄</h2>
+        <div class="card">
+          <select id="roomSelect" onchange="showRoomDue()"></select>
+          <div id="roomDueInfo"></div>
+          <input id="amountInput" type="number" placeholder="收款金額">
+          <button onclick="submitCash()">確認收款並產生收據</button>
+          <div id="receiptResult"></div>
+        </div>
+      </section>
 
-    <h2>新增租客</h2>
-    <input id="tenantRoom" placeholder="房號（例如：1AB）">
-    <input id="tenantName" placeholder="租戶姓名">
-    <input id="tenantRent" type="number" placeholder="房屋租金">
-    <input id="tenantDeposit" type="number" placeholder="押金">
-    <input id="tenantMoveIn" type="date">
-    <input id="tenantPhone" placeholder="手機號碼">
-    <button onclick="submitTenant()">新增租客</button>
-    <p id="tenantMsg"></p>
+      <section>
+        <h2>📤 支出登錄</h2>
+        <div class="card">
+          <select id="expensePeriodSelect"></select>
+          <input id="expenseDate" type="date">
+          <input id="expenseItem" placeholder="支出項目（例如：水電修繕）">
+          <input id="expenseAmount" type="number" placeholder="金額">
+          <textarea id="expenseNote" placeholder="備註（選填）" rows="2"></textarea>
+          <button onclick="submitExpense()">登錄支出</button>
+          <p id="expenseMsg"></p>
+          <button class="secondary" onclick="loadExpenses()">查詢本期支出</button>
+          <div id="expenseList" style="margin-top:8px;"></div>
+          <div id="expenseTotal"></div>
+        </div>
+      </section>
+
+      <section>
+        <h2>🧍 新增租客</h2>
+        <div class="card">
+          <input id="tenantRoom" placeholder="房號（例如：1AB）">
+          <input id="tenantName" placeholder="租戶姓名">
+          <input id="tenantRent" type="number" placeholder="房屋租金">
+          <input id="tenantDeposit" type="number" placeholder="押金">
+          <input id="tenantMoveIn" type="date">
+          <input id="tenantPhone" placeholder="手機號碼">
+          <button onclick="submitTenant()">新增租客</button>
+          <p id="tenantMsg"></p>
+        </div>
+      </section>
+    </div>
   </div>
 
   <!-- 以下區塊平常隱藏，只有按「列印收據」時，透過瀏覽器列印功能才會印出來 -->
@@ -272,7 +403,7 @@
     function renderBills(bills) {
       var list = document.getElementById('billList');
       if (bills.length === 0) {
-        list.innerHTML = '<p>這期尚未匯入繳費單</p>';
+        list.innerHTML = '<div class="card"><p>這期尚未匯入繳費單</p></div>';
         return;
       }
       list.innerHTML = bills.map(function (b) {
@@ -356,7 +487,7 @@
         return;
       }
       if (list.length === 0) {
-        box.innerHTML = '<p>這期全部房號都已銷帳</p>';
+        box.innerHTML = '<div class="card"><p>這期全部房號都已銷帳</p></div>';
         return;
       }
       var clsMap = { 已銷帳: 's-paid', 已繳未銷: 's-unconfirmed', 未銷帳: 's-unpaid', 部分繳款: 's-partial' };
@@ -371,7 +502,7 @@
             '</div>';
         }
         return '<div class="status-row">' +
-          '<div class="row-top"><span>' + r.房號 + ' ' + r.租戶姓名 + '</span><span class="' + cls + '">' + r.狀態 + '</span></div>' +
+          '<div class="row-top"><span>' + r.房號 + ' ' + r.租戶姓名 + '</span><span class="badge ' + cls + '">' + r.狀態 + '</span></div>' +
           detail +
           '</div>';
       }).join('');
@@ -398,7 +529,7 @@
         var box = document.getElementById('receiptResult');
         box.className = isPartial ? 'partial' : '';
         box.style.display = 'block';
-        box.innerHTML = '<p>收款成功</p>' +
+        box.innerHTML = '<p>✅ 收款成功</p>' +
           '<p>收據編號：' + res.receiptNo + '</p>' +
           '<p>時間：' + res.date + '</p>' +
           '<p>本次收款：' + res.本次收款 + ' 元｜累計已收：' + res.累計已收 + ' 元' + (res.應繳金額 != null ? '｜應繳：' + res.應繳金額 + ' 元' : '') + '</p>' +
