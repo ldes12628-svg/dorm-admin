@@ -223,6 +223,7 @@
         <div class="acc-header" onclick="toggleSection('arrearsBody')">📋 欠費彙總 <span class="acc-arrow" id="arrearsBody-arrow">▸</span></div>
         <div class="acc-content" id="arrearsBody">
           <button class="secondary" onclick="loadArrears()">重新整理欠費彙總</button>
+          <input id="arrearsSearch" placeholder="輸入房號或租戶姓名查詢（例如：1AB 或 林惠蘭）" oninput="renderArrearsFiltered()">
           <div id="arrearsList" style="margin-top:8px;"></div>
         </div>
       </div>
@@ -554,18 +555,45 @@
       }).join('');
     }
 
-    function loadArrears() {
-      var box = document.getElementById('arrearsList');
-      box.innerHTML = '查詢中…（需逐期彙整，可能需要幾秒）';
-      callApi('getArrearsSummary').then(function (list) {
-        if (list.length === 0) {
-          box.innerHTML = '<div class="card"><p>目前沒有任何房號有欠款 🎉</p></div>';
-          return;
-        }
-        box.innerHTML = list.map(function (r) {
-          var detailHtml = r.明細.map(function (d) {
-            return '<div class="arrears-detail-row"><span>' + d.期別 + '（' + d.狀態 + '）</span><span>' + d.尚欠金額 + ' 元</span></div>';
-          }).join('');
+    var arrearsData = [];
+
+function loadArrears() {
+  var box = document.getElementById('arrearsList');
+  box.innerHTML = '查詢中…（需逐期彙整，可能需要幾秒）';
+  callApi('getArrearsSummary').then(function (list) {
+    arrearsData = list;
+    renderArrearsFiltered();
+  }).catch(function (err) {
+    box.innerHTML = '<p style="color:#c00;">查詢失敗：' + err.message + '</p>';
+  });
+}
+
+function renderArrearsFiltered() {
+  var keyword = document.getElementById('arrearsSearch').value.trim();
+  var box = document.getElementById('arrearsList');
+  if (arrearsData.length === 0) {
+    box.innerHTML = '<div class="card"><p>目前沒有任何房號有欠款 🎉</p></div>';
+    return;
+  }
+  var list = keyword
+    ? arrearsData.filter(function (r) {
+        return String(r.房號).indexOf(keyword) !== -1 || String(r.租戶姓名).indexOf(keyword) !== -1;
+      })
+    : arrearsData;
+  if (list.length === 0) {
+    box.innerHTML = '<div class="card"><p>沒有符合「' + keyword + '」的房號</p></div>';
+    return;
+  }
+  box.innerHTML = list.map(function (r) {
+    var detailHtml = r.明細.map(function (d) {
+      return '<div class="arrears-detail-row"><span>' + d.期別 + '（' + d.狀態 + '）</span><span>' + d.尚欠金額 + ' 元</span></div>';
+    }).join('');
+    return '<div class="arrears-card">' +
+      '<h3><span>' + r.房號 + ' ' + r.租戶姓名 + '</span><span class="arrears-total">共欠 ' + r.總欠款 + ' 元</span></h3>' +
+      detailHtml +
+      '</div>';
+  }).join('');
+}
           return '<div class="arrears-card">' +
             '<h3><span>' + r.房號 + ' ' + r.租戶姓名 + '</span><span class="arrears-total">共欠 ' + r.總欠款 + ' 元</span></h3>' +
             detailHtml +
