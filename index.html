@@ -144,6 +144,12 @@
 
     #meterProgress { font-size: 13px; color: #2c7be5; font-weight: 700; margin: 8px 0; }
 
+    .arrears-card { border: 1px solid #fdd; background: #fff9f9; border-radius: 12px; padding: 12px 14px; margin-bottom: 8px; }
+    .arrears-card h3 { margin: 0 0 4px; font-size: 14.5px; font-weight: 700; display: flex; justify-content: space-between; }
+    .arrears-total { color: #d33; font-weight: 700; }
+    .arrears-detail-row { display: flex; justify-content: space-between; font-size: 12.5px; color: #888; padding: 3px 0; border-top: 1px dashed #eee; }
+    .arrears-detail-row:first-of-type { border-top: none; margin-top: 4px; }
+
     #printArea { display: none; }
     @media print {
       body * { visibility: hidden; }
@@ -214,9 +220,18 @@
       </div>
 
       <div class="acc">
+        <div class="acc-header" onclick="toggleSection('arrearsBody')">📋 欠費彙總 <span class="acc-arrow" id="arrearsBody-arrow">▸</span></div>
+        <div class="acc-content" id="arrearsBody">
+          <button class="secondary" onclick="loadArrears()">重新整理欠費彙總</button>
+          <div id="arrearsList" style="margin-top:8px;"></div>
+        </div>
+      </div>
+
+      <div class="acc">
         <div class="acc-header" onclick="toggleSection('cashBody')">💵 現金收款登錄 <span class="acc-arrow" id="cashBody-arrow">▸</span></div>
         <div class="acc-content" id="cashBody">
           <select id="roomSelect" onchange="showRoomDue()"></select>
+          <select id="cashPeriodSelect" onchange="showRoomDue()"></select>
           <div id="roomDueInfo"></div>
           <input id="amountInput" type="number" placeholder="收款金額">
           <button onclick="submitCash()">確認收款並產生收據</button>
@@ -396,6 +411,7 @@
         fillPeriodSelect('statusPeriodSelect', options);
         fillPeriodSelect('expensePeriodSelect', options);
         fillPeriodSelect('billPeriodSelect', options);
+        fillPeriodSelect('cashPeriodSelect', options);
         loadStatus();
         loadBills();
         var today = new Date();
@@ -468,16 +484,17 @@
 
     function showRoomDue() {
       var room = document.getElementById('roomSelect').value;
+      var period = document.getElementById('cashPeriodSelect').value;
       var info = document.getElementById('roomDueInfo');
       if (!room) { info.innerText = ''; return; }
       info.innerText = '查詢中…';
-      callApi('getPaymentStatus').then(function (list) {
+      callApi('getPaymentStatus', { period: period }).then(function (list) {
         var found = list.filter(function (r) { return r.房號 === room; })[0];
         if (!found) { info.innerText = ''; return; }
         if (found.應繳金額 == null) {
-          info.innerText = '本期尚未匯入這個房號的帳單金額';
+          info.innerText = '這期尚未匯入這個房號的帳單金額';
         } else if (found.狀態 === '已銷帳') {
-          info.innerText = '本期已結清（已收 ' + found.已收金額 + ' 元）';
+          info.innerText = '這期已結清（已收 ' + found.已收金額 + ' 元）';
         } else {
           info.innerText = '應繳 ' + found.應繳金額 + ' 元｜已收 ' + found.已收金額 + ' 元｜尚欠 ' + found.尚欠金額 + ' 元';
         }
@@ -537,25 +554,47 @@
       }).join('');
     }
 
+    function loadArrears() {
+      var box = document.getElementById('arrearsList');
+      box.innerHTML = '查詢中…（需逐期彙整，可能需要幾秒）';
+      callApi('getArrearsSummary').then(function (list) {
+        if (list.length === 0) {
+          box.innerHTML = '<div class="card"><p>目前沒有任何房號有欠款 🎉</p></div>';
+          return;
+        }
+        box.innerHTML = list.map(function (r) {
+          var detailHtml = r.明細.map(function (d) {
+            return '<div class="arrears-detail-row"><span>' + d.期別 + '（' + d.狀態 + '）</span><span>' + d.尚欠金額 + ' 元</span></div>';
+          }).join('');
+          return '<div class="arrears-card">' +
+            '<h3><span>' + r.房號 + ' ' + r.租戶姓名 + '</span><span class="arrears-total">共欠 ' + r.總欠款 + ' 元</span></h3>' +
+            detailHtml +
+            '</div>';
+        }).join('');
+      }).catch(function (err) {
+        box.innerHTML = '<p style="color:#c00;">查詢失敗：' + err.message + '</p>';
+      });
+    }
+
     function submitCash() {
       var room = document.getElementById('roomSelect').value;
+      var period = document.getElementById('cashPeriodSelect').value;
       var amount = document.getElementById('amountInput').value;
       if (!room || !amount) { alert('請選擇房號並輸入金額'); return; }
-      callApi('submitCashPayment', { room: room, amount: amount, userId: userId }).then(function (res) {
+      callApi('submitCashPayment', { room: room, amount: amount, userId: userId, period: period }).then(function (res) {
         if (!res.success) { alert(res.message); return; }
-        var period = res.receiptNo.split('-')[0];
         var isPartial = res.狀態 === '部分繳款';
         var note = isPartial ? '部分繳款，尚欠 ' + res.尚欠金額 + ' 元' : '已全額結清';
 
         var box = document.getElementById('receiptResult');
         box.className = isPartial ? 'partial' : '';
         box.style.display = 'block';
-        box.innerHTML = '<p>✅ 收款成功</p>' +
+        box.innerHTML = '<p>✅ 收款成功（期別：' + res.period + '）</p>' +
           '<p>收據編號：' + res.receiptNo + '</p>' +
           '<p>時間：' + res.date + '</p>' +
           '<p>本次收款：' + res.本次收款 + ' 元｜累計已收：' + res.累計已收 + ' 元' + (res.應繳金額 != null ? '｜應繳：' + res.應繳金額 + ' 元' : '') + '</p>' +
           '<p class="r-note">' + note + '</p>' +
-          '<button onclick="printReceipt(\'' + res.receiptNo + '\',\'' + period + '\',\'' + room + '\',\'' + res.本次收款 + '\',\'' + res.date + '\',\'' + note + '\')">列印三聯收據</button>' +
+          '<button onclick="printReceipt(\'' + res.receiptNo + '\',\'' + res.period + '\',\'' + room + '\',\'' + res.本次收款 + '\',\'' + res.date + '\',\'' + note + '\')">列印三聯收據</button>' +
           '<button class="secondary" onclick="location.reload()">完成，繼續下一筆</button>';
         document.getElementById('amountInput').value = '';
       }).catch(function (err) { alert('登錄失敗：' + err.message); });
