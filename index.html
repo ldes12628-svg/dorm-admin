@@ -26,28 +26,28 @@
       box-shadow: 0 2px 8px rgba(6,199,85,0.25);
     }
 
-    section { margin-top: 22px; }
-    h2 {
+    .acc { margin-top: 12px; background: #fff; border-radius: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); overflow: hidden; }
+    .acc-header {
+      padding: 14px 16px;
       font-size: 15px;
       font-weight: 700;
-      color: #444;
-      margin: 0 0 10px;
-      padding-bottom: 6px;
-      border-bottom: 2px solid #e5e7eb;
+      color: #333;
       display: flex;
+      justify-content: space-between;
       align-items: center;
-      gap: 6px;
+      cursor: pointer;
     }
+    .acc-arrow { color: #999; font-size: 13px; transition: transform 0.15s; }
+    .acc-content { padding: 0 16px 16px; display: none; }
 
     .card {
-      background: #fff;
+      background: #fafbfc;
       border: 1px solid #eee;
-      border-radius: 14px;
-      padding: 14px 16px;
-      margin-bottom: 10px;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+      border-radius: 12px;
+      padding: 12px 14px;
+      margin-bottom: 8px;
     }
-    .card h3 { margin: 0 0 6px; font-size: 15px; font-weight: 700; }
+    .card h3 { margin: 0 0 6px; font-size: 14.5px; font-weight: 700; }
     .card p { margin: 2px 0; font-size: 13px; color: #777; }
 
     button {
@@ -64,6 +64,7 @@
     }
     button:active { opacity: 0.75; }
     button.secondary { background: #eceef1; color: #444; }
+    button.small { width: auto; padding: 5px 10px; font-size: 12.5px; margin: 0; }
 
     select, input, textarea {
       font-size: 15px;
@@ -80,7 +81,6 @@
       border-color: #06c755;
       box-shadow: 0 0 0 3px rgba(6,199,85,0.12);
     }
-    input.filled { border-color: #27ae60; background: #f0fff4; }
 
     label.checkline {
       display: flex;
@@ -100,7 +100,6 @@
       border-radius: 12px;
       padding: 10px 14px;
       margin-bottom: 8px;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.03);
     }
     .status-row .row-top { display: flex; justify-content: space-between; align-items: center; font-size: 14px; font-weight: 500; }
     .status-row .row-detail { margin-top: 4px; font-size: 12px; color: #999; display: flex; justify-content: flex-end; gap: 10px; }
@@ -111,7 +110,7 @@
     .s-unpaid { background: #fdeaea; color: #d33; }
     .s-partial { background: #fff0e0; color: #ff8c00; }
 
-    #roomDueInfo { font-size: 13px; color: #888; margin: -2px 0 8px; min-height: 16px; padding-left: 2px; }
+    #roomDueInfo, #meterRoomInfo, #tenantCurrentInfo { font-size: 13px; color: #888; margin: -2px 0 8px; min-height: 16px; padding-left: 2px; }
 
     #receiptResult {
       background: #f0fff4;
@@ -129,8 +128,8 @@
     .expense-row {
       display: flex;
       justify-content: space-between;
-      align-items: flex-start;
-      padding: 10px 0;
+      align-items: center;
+      padding: 8px 0;
       border-bottom: 1px solid #f0f0f0;
       font-size: 13.5px;
     }
@@ -143,20 +142,7 @@
     .msg-ok { color: #06a648; font-weight: 700; font-size: 13.5px; white-space: pre-line; }
     .msg-err { color: #d33; font-weight: 700; font-size: 13.5px; white-space: pre-line; }
 
-    #meterProgress {
-      font-size: 13px;
-      color: #2c7be5;
-      font-weight: 700;
-      margin-bottom: 8px;
-      position: sticky;
-      top: 0;
-      background: #fff;
-      z-index: 5;
-      padding: 4px 0;
-    }
-    .meter-card { border-left: 4px solid transparent; }
-    .meter-card.done { border-left-color: #27ae60; }
-    .meter-tag { font-size: 11px; color: #27ae60; margin-top: 4px; min-height: 14px; }
+    #meterProgress { font-size: 13px; color: #2c7be5; font-weight: 700; margin: 8px 0; }
 
     #printArea { display: none; }
     @media print {
@@ -181,57 +167,66 @@
     <div id="status">載入中…</div>
 
     <div id="bindScreen">
-      <section>
-        <h2>🔑 管理員綁定</h2>
-        <div class="card">
+      <div class="acc" style="margin-top:16px;">
+        <div class="acc-header">🔑 管理員綁定</div>
+        <div class="acc-content" style="display:block;">
           <p>請輸入公司給你的驗證碼完成第一次綁定：</p>
           <input id="bindCode" placeholder="輸入驗證碼">
           <button onclick="doBind()">送出</button>
           <p id="bindMsg" style="color:#c00; margin-top:8px;"></p>
         </div>
-      </section>
+      </div>
     </div>
 
     <div id="mainScreen">
-      <section>
-        <h2>⚡ 用電抄表</h2>
-        <div class="card">
+
+      <div class="acc">
+        <div class="acc-header" onclick="toggleSection('meterBody')">⚡ 用電抄表 <span class="acc-arrow" id="meterBody-arrow">▸</span></div>
+        <div class="acc-content" id="meterBody">
+          <select id="meterRoomSelect" onchange="onMeterRoomChange()"></select>
+          <div id="meterRoomInfo"></div>
+          <input id="meterReadingInput" type="number" placeholder="輸入本期度數">
+          <button onclick="saveMeterReading()">加入本次抄表清單</button>
           <div id="meterProgress"></div>
-          <div id="meterList"></div>
-          <button onclick="submitMeterReadings()">產生並寄出電費 Excel</button>
+          <div id="meterFilledList"></div>
+          <button class="secondary" onclick="submitMeterReadings()" style="margin-top:10px;">產生並寄出電費 Excel</button>
           <p id="meterMsg"></p>
         </div>
-      </section>
+      </div>
 
-      <section>
-        <h2>🧾 繳費單查詢</h2>
-        <select id="billPeriodSelect" onchange="loadBills()"></select>
-        <div id="billList"></div>
-      </section>
+      <div class="acc">
+        <div class="acc-header" onclick="toggleSection('billBody')">🧾 繳費單查詢 <span class="acc-arrow" id="billBody-arrow">▸</span></div>
+        <div class="acc-content" id="billBody">
+          <select id="billPeriodSelect" onchange="loadBills()"></select>
+          <div id="billList"></div>
+        </div>
+      </div>
 
-      <section>
-        <h2>📊 繳費狀況查詢</h2>
-        <select id="statusPeriodSelect" onchange="loadStatus()"></select>
-        <label class="checkline">
-          <input type="checkbox" id="onlyUnpaid" checked onchange="renderStatus()" style="width:auto; margin:0;"> 只顯示未結清（未銷帳/已繳未銷/部分繳款）
-        </label>
-        <div id="statusList"></div>
-      </section>
+      <div class="acc">
+        <div class="acc-header" onclick="toggleSection('statusBody')">📊 繳費狀況查詢 <span class="acc-arrow" id="statusBody-arrow">▸</span></div>
+        <div class="acc-content" id="statusBody">
+          <select id="statusPeriodSelect" onchange="loadStatus()"></select>
+          <label class="checkline">
+            <input type="checkbox" id="onlyUnpaid" checked onchange="renderStatus()" style="width:auto; margin:0;"> 只顯示未結清（未銷帳/已繳未銷/部分繳款）
+          </label>
+          <div id="statusList"></div>
+        </div>
+      </div>
 
-      <section>
-        <h2>💵 現金收款登錄</h2>
-        <div class="card">
+      <div class="acc">
+        <div class="acc-header" onclick="toggleSection('cashBody')">💵 現金收款登錄 <span class="acc-arrow" id="cashBody-arrow">▸</span></div>
+        <div class="acc-content" id="cashBody">
           <select id="roomSelect" onchange="showRoomDue()"></select>
           <div id="roomDueInfo"></div>
           <input id="amountInput" type="number" placeholder="收款金額">
           <button onclick="submitCash()">確認收款並產生收據</button>
           <div id="receiptResult"></div>
         </div>
-      </section>
+      </div>
 
-      <section>
-        <h2>📤 支出登錄</h2>
-        <div class="card">
+      <div class="acc">
+        <div class="acc-header" onclick="toggleSection('expenseBody')">📤 支出登錄 <span class="acc-arrow" id="expenseBody-arrow">▸</span></div>
+        <div class="acc-content" id="expenseBody">
           <select id="expensePeriodSelect"></select>
           <input id="expenseDate" type="date">
           <input id="expenseItem" placeholder="支出項目（例如：水電修繕）">
@@ -243,25 +238,26 @@
           <div id="expenseList" style="margin-top:8px;"></div>
           <div id="expenseTotal"></div>
         </div>
-      </section>
+      </div>
 
-      <section>
-        <h2>🧍 新增租客</h2>
-        <div class="card">
-          <input id="tenantRoom" placeholder="房號（例如：1AB）">
+      <div class="acc">
+        <div class="acc-header" onclick="toggleSection('tenantBody')">🧍 租客資料維護 <span class="acc-arrow" id="tenantBody-arrow">▸</span></div>
+        <div class="acc-content" id="tenantBody">
+          <select id="tenantRoomSelect" onchange="onTenantRoomChange()"></select>
+          <div id="tenantCurrentInfo"></div>
           <input id="tenantName" placeholder="租戶姓名">
           <input id="tenantRent" type="number" placeholder="房屋租金">
           <input id="tenantDeposit" type="number" placeholder="押金">
           <input id="tenantMoveIn" type="date">
           <input id="tenantPhone" placeholder="手機號碼">
-          <button onclick="submitTenant()">新增租客</button>
+          <button onclick="submitTenantUpdate()">更新房客資料</button>
           <p id="tenantMsg"></p>
         </div>
-      </section>
+      </div>
+
     </div>
   </div>
 
-  <!-- 以下區塊平常隱藏，只有按「列印收據」時，透過瀏覽器列印功能才會印出來 -->
   <div id="printArea">
     <div class="receipt-copy">
       <div class="receipt-title"><span>啟乘工程有限公司 現金收據</span><span>存根聯</span></div>
@@ -297,12 +293,8 @@
 
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
   <script>
-    var LIFF_ID = '2010574364-GyqCDEpu'; // 替換成 LINE Developers Console 拿到的 LIFF ID
-
-    // 宿舍管理系統本身的 API（完全不變）
+    var LIFF_ID = '2010574364-GyqCDEpu';
     var API_BASE = 'https://script.google.com/macros/s/AKfycbyJ-r3ocN9riXeskpYDTJyG5cVLVJ2tmZzjxX-ljFXujoRex0AdLp7jpPOKfhAt-Bk/exec';
-
-    // 抄表系統的 API（獨立的另一個 Apps Script 專案，資料庫互不相通）
     var METER_API_BASE = 'https://script.google.com/macros/s/AKfycbzHvJEwrhzF5qwQlI3_n1ZEnJRs3o0zr08LbIQoQtanL0uL7-Jp1pcHTyqB4psX3hOMBg/exec';
     var METER_DRAFT_KEY = 'meter_draft_v1';
 
@@ -311,11 +303,25 @@
     var allStatus = [];
     var periodOptions = [];
     var meterRooms = [];
+    var meterDraft = {};
+    var tenantOriginal = null;
 
     window.onerror = function (msg, url, line) {
       document.getElementById('status').style.display = 'block';
       document.getElementById('status').innerText = '發生錯誤：' + msg + '（第 ' + line + ' 行）';
     };
+
+    function toggleSection(id) {
+      var content = document.getElementById(id);
+      var isOpen = content.style.display === 'block';
+      document.querySelectorAll('.acc-content').forEach(function (el) { el.style.display = 'none'; });
+      document.querySelectorAll('.acc-arrow').forEach(function (el) { el.innerText = '▸'; });
+      if (!isOpen) {
+        content.style.display = 'block';
+        var arrow = document.getElementById(id + '-arrow');
+        if (arrow) arrow.innerText = '▾';
+      }
+    }
 
     function callApi(action, params) {
       params = params || {};
@@ -381,6 +387,7 @@
       loadPeriodOptions();
       loadRooms();
       loadMeterRooms();
+      loadTenantRoomOptions();
     }
 
     function loadPeriodOptions() {
@@ -485,15 +492,8 @@
         return;
       }
       liff.shareTargetPicker([
-        {
-          type: 'image',
-          originalContentUrl: imageUrl,
-          previewImageUrl: imageUrl
-        },
-        {
-          type: 'text',
-          text: room + ' 本期繳費單，請確認金額並於期限前繳費，謝謝。'
-        }
+        { type: 'image', originalContentUrl: imageUrl, previewImageUrl: imageUrl },
+        { type: 'text', text: room + ' 本期繳費單，請確認金額並於期限前繳費，謝謝。' }
       ]).catch(function (err) {
         alert('分享失敗：' + err);
       });
@@ -514,10 +514,7 @@
       var onlyUnpaid = document.getElementById('onlyUnpaid').checked;
       var list = onlyUnpaid ? allStatus.filter(function (r) { return r.狀態 !== '已銷帳'; }) : allStatus;
       var box = document.getElementById('statusList');
-      if (allStatus.length === 0) {
-        box.innerHTML = '';
-        return;
-      }
+      if (allStatus.length === 0) { box.innerHTML = ''; return; }
       if (list.length === 0) {
         box.innerHTML = '<div class="card"><p>這期全部房號都已銷帳</p></div>';
         return;
@@ -543,20 +540,12 @@
     function submitCash() {
       var room = document.getElementById('roomSelect').value;
       var amount = document.getElementById('amountInput').value;
-      if (!room || !amount) {
-        alert('請選擇房號並輸入金額');
-        return;
-      }
+      if (!room || !amount) { alert('請選擇房號並輸入金額'); return; }
       callApi('submitCashPayment', { room: room, amount: amount, userId: userId }).then(function (res) {
-        if (!res.success) {
-          alert(res.message);
-          return;
-        }
+        if (!res.success) { alert(res.message); return; }
         var period = res.receiptNo.split('-')[0];
         var isPartial = res.狀態 === '部分繳款';
-        var note = isPartial
-          ? '部分繳款，尚欠 ' + res.尚欠金額 + ' 元'
-          : '已全額結清';
+        var note = isPartial ? '部分繳款，尚欠 ' + res.尚欠金額 + ' 元' : '已全額結清';
 
         var box = document.getElementById('receiptResult');
         box.className = isPartial ? 'partial' : '';
@@ -569,9 +558,7 @@
           '<button onclick="printReceipt(\'' + res.receiptNo + '\',\'' + period + '\',\'' + room + '\',\'' + res.本次收款 + '\',\'' + res.date + '\',\'' + note + '\')">列印三聯收據</button>' +
           '<button class="secondary" onclick="location.reload()">完成，繼續下一筆</button>';
         document.getElementById('amountInput').value = '';
-      }).catch(function (err) {
-        alert('登錄失敗：' + err.message);
-      });
+      }).catch(function (err) { alert('登錄失敗：' + err.message); });
     }
 
     function printReceipt(no, period, room, amount, date, note) {
@@ -594,28 +581,17 @@
       var note = document.getElementById('expenseNote').value.trim();
       var msg = document.getElementById('expenseMsg');
 
-      if (!item || !amount) {
-        msg.className = 'msg-err';
-        msg.innerText = '請輸入項目名稱與金額';
-        return;
-      }
+      if (!item || !amount) { msg.className = 'msg-err'; msg.innerText = '請輸入項目名稱與金額'; return; }
 
       callApi('submitExpense', { period: period, date: date, item: item, amount: amount, note: note, userId: userId }).then(function (res) {
-        if (!res.success) {
-          msg.className = 'msg-err';
-          msg.innerText = res.message;
-          return;
-        }
+        if (!res.success) { msg.className = 'msg-err'; msg.innerText = res.message; return; }
         msg.className = 'msg-ok';
         msg.innerText = '登錄成功：' + res.item + ' ' + res.amount + ' 元';
         document.getElementById('expenseItem').value = '';
         document.getElementById('expenseAmount').value = '';
         document.getElementById('expenseNote').value = '';
         loadExpenses();
-      }).catch(function (err) {
-        msg.className = 'msg-err';
-        msg.innerText = '登錄失敗：' + err.message;
-      });
+      }).catch(function (err) { msg.className = 'msg-err'; msg.innerText = '登錄失敗：' + err.message; });
     }
 
     function loadExpenses() {
@@ -625,11 +601,7 @@
       box.innerHTML = '查詢中…';
       totalBox.innerText = '';
       callApi('getExpenses', { period: period }).then(function (res) {
-        if (res.items.length === 0) {
-          box.innerHTML = '<p>這期尚無支出紀錄</p>';
-          totalBox.innerText = '';
-          return;
-        }
+        if (res.items.length === 0) { box.innerHTML = '<p>這期尚無支出紀錄</p>'; totalBox.innerText = ''; return; }
         box.innerHTML = res.items.map(function (e) {
           return '<div class="expense-row">' +
             '<div><div class="e-item">' + e.日期 + ' ' + e.項目 + '</div>' +
@@ -638,142 +610,94 @@
             '</div>';
         }).join('');
         totalBox.innerText = '本期支出合計：' + res.total + ' 元';
-      }).catch(function (err) {
-        box.innerHTML = '<p style="color:#c00;">查詢失敗：' + err.message + '</p>';
-      });
-    }
-
-    function submitTenant() {
-      var room = document.getElementById('tenantRoom').value.trim();
-      var name = document.getElementById('tenantName').value.trim();
-      var rent = document.getElementById('tenantRent').value;
-      var deposit = document.getElementById('tenantDeposit').value;
-      var moveIn = document.getElementById('tenantMoveIn').value;
-      var phone = document.getElementById('tenantPhone').value.trim();
-      var msg = document.getElementById('tenantMsg');
-
-      if (!room || !name) {
-        msg.className = 'msg-err';
-        msg.innerText = '請輸入房號與租戶姓名';
-        return;
-      }
-
-      callApi('addTenant', {
-        room: room, name: name, rent: rent, deposit: deposit,
-        moveInDate: moveIn, phone: phone, userId: userId
-      }).then(function (res) {
-        if (!res.success) {
-          msg.className = 'msg-err';
-          msg.innerText = res.message;
-          return;
-        }
-        msg.className = 'msg-ok';
-        msg.innerText = '新增成功：' + res.room + ' ' + res.name;
-        document.getElementById('tenantRoom').value = '';
-        document.getElementById('tenantName').value = '';
-        document.getElementById('tenantRent').value = '';
-        document.getElementById('tenantDeposit').value = '';
-        document.getElementById('tenantMoveIn').value = '';
-        document.getElementById('tenantPhone').value = '';
-        loadRooms();
-      }).catch(function (err) {
-        msg.className = 'msg-err';
-        msg.innerText = '新增失敗：' + err.message;
-      });
+      }).catch(function (err) { box.innerHTML = '<p style="color:#c00;">查詢失敗：' + err.message + '</p>'; });
     }
 
     // ---------- 用電抄表（呼叫獨立的抄表系統 API） ----------
 
     function loadMeterRooms() {
-      document.getElementById('meterList').innerHTML = '載入中…';
+      document.getElementById('meterFilledList').innerHTML = '';
       fetch(METER_API_BASE + '?action=getRooms').then(function (res) {
         if (!res.ok) throw new Error('HTTP ' + res.status);
         return res.json();
       }).then(function (rooms) {
         meterRooms = rooms;
-        renderMeterRooms();
+        try { meterDraft = JSON.parse(localStorage.getItem(METER_DRAFT_KEY) || '{}'); } catch (e) { meterDraft = {}; }
+        fillMeterRoomSelect();
+        renderMeterFilledList();
+        onMeterRoomChange();
       }).catch(function (err) {
-        document.getElementById('meterList').innerHTML = '<p style="color:#c00;">載入失敗：' + err.message + '</p>';
+        document.getElementById('meterRoomSelect').innerHTML = '<option>載入失敗：' + err.message + '</option>';
       });
     }
 
-    function renderMeterRooms() {
-      var box = document.getElementById('meterList');
-      if (meterRooms.length === 0) {
-        box.innerHTML = '<p>沒有讀到房間資料</p>';
-        return;
-      }
-      var draft = {};
-      try { draft = JSON.parse(localStorage.getItem(METER_DRAFT_KEY) || '{}'); } catch (e) { draft = {}; }
+    function fillMeterRoomSelect() {
+      var select = document.getElementById('meterRoomSelect');
+      select.innerHTML = '';
+      meterRooms.forEach(function (r) {
+        var opt = document.createElement('option');
+        opt.value = r.房號;
+        opt.innerText = r.房號 + (r.房客姓名 ? ' ' + r.房客姓名 : '') + (meterDraft[r.房號] !== undefined ? '（已填）' : '');
+        select.appendChild(opt);
+      });
+    }
 
-      box.innerHTML = meterRooms.map(function (r) {
-        var val = draft[r.房號] !== undefined ? draft[r.房號] : '';
-        var filledClass = val !== '' ? ' filled' : '';
-        var doneClass = val !== '' ? ' done' : '';
-        return '<div class="card meter-card' + doneClass + '" id="meter_card_' + r.房號 + '" style="margin-bottom:8px;">' +
-          '<h3>' + r.房號 + (r.房客姓名 ? '　' + r.房客姓名 : '') + '</h3>' +
-          '<p>上期度數：' + r.上期度數 + '</p>' +
-          '<input type="number" inputmode="numeric" class="' + filledClass.trim() + '" placeholder="輸入本期度數" value="' + val + '" ' +
-          'data-room="' + r.房號 + '" data-last="' + r.上期度數 + '" oninput="onMeterInput(this)">' +
-          '<div class="meter-tag" id="meter_tag_' + r.房號 + '">' + (val !== '' ? '✓ 已填：' + val + ' 度' : '') + '</div>' +
-          '</div>';
+    function onMeterRoomChange() {
+      var room = document.getElementById('meterRoomSelect').value;
+      var found = meterRooms.filter(function (r) { return r.房號 === room; })[0];
+      var info = document.getElementById('meterRoomInfo');
+      if (!found) { info.innerText = ''; return; }
+      info.innerText = '上期度數：' + found.上期度數 + (meterDraft[room] !== undefined ? '｜本次已填：' + meterDraft[room] + ' 度' : '');
+      document.getElementById('meterReadingInput').value = meterDraft[room] !== undefined ? meterDraft[room] : '';
+    }
+
+    function saveMeterReading() {
+      var room = document.getElementById('meterRoomSelect').value;
+      var val = document.getElementById('meterReadingInput').value;
+      if (!room || val === '') { alert('請輸入本期度數'); return; }
+      meterDraft[room] = val;
+      try { localStorage.setItem(METER_DRAFT_KEY, JSON.stringify(meterDraft)); } catch (e) {}
+      fillMeterRoomSelect();
+      document.getElementById('meterRoomSelect').value = room;
+      renderMeterFilledList();
+      onMeterRoomChange();
+    }
+
+    function removeMeterDraft(room) {
+      delete meterDraft[room];
+      try { localStorage.setItem(METER_DRAFT_KEY, JSON.stringify(meterDraft)); } catch (e) {}
+      fillMeterRoomSelect();
+      renderMeterFilledList();
+      onMeterRoomChange();
+    }
+
+    function renderMeterFilledList() {
+      var keys = Object.keys(meterDraft);
+      document.getElementById('meterProgress').innerText = '已填 ' + keys.length + ' / ' + meterRooms.length + ' 間';
+      var box = document.getElementById('meterFilledList');
+      if (keys.length === 0) { box.innerHTML = ''; return; }
+      box.innerHTML = keys.map(function (room) {
+        return '<div class="expense-row"><span>' + room + '：' + meterDraft[room] + ' 度</span>' +
+          '<button class="secondary small" onclick="removeMeterDraft(\'' + room + '\')">移除</button></div>';
       }).join('');
-      updateMeterProgress();
-    }
-
-    function onMeterInput(inp) {
-      var room = inp.getAttribute('data-room');
-      var card = document.getElementById('meter_card_' + room);
-      var tag = document.getElementById('meter_tag_' + room);
-      if (inp.value !== '') {
-        inp.classList.add('filled');
-        card.classList.add('done');
-        tag.innerText = '✓ 已填：' + inp.value + ' 度';
-      } else {
-        inp.classList.remove('filled');
-        card.classList.remove('done');
-        tag.innerText = '';
-      }
-      saveMeterDraft();
-      updateMeterProgress();
-    }
-
-    function saveMeterDraft() {
-      var draft = {};
-      document.querySelectorAll('#meterList input[type=number]').forEach(function (inp) {
-        if (inp.value !== '') draft[inp.getAttribute('data-room')] = inp.value;
-      });
-      try { localStorage.setItem(METER_DRAFT_KEY, JSON.stringify(draft)); } catch (e) {}
-    }
-
-    function updateMeterProgress() {
-      var inputs = document.querySelectorAll('#meterList input[type=number]');
-      var filled = 0;
-      inputs.forEach(function (inp) { if (inp.value !== '') filled++; });
-      document.getElementById('meterProgress').innerText = '已填 ' + filled + ' / ' + inputs.length + ' 間';
     }
 
     function submitMeterReadings() {
-      var inputs = document.querySelectorAll('#meterList input[type=number]');
+      var keys = Object.keys(meterDraft);
+      if (keys.length === 0) { alert('請至少輸入一間房間的本期度數'); return; }
       var readings = [];
       var abnormal = [];
-      inputs.forEach(function (inp) {
-        if (inp.value === '') return;
-        var room = inp.getAttribute('data-room');
-        var last = Number(inp.getAttribute('data-last')) || 0;
-        var cur = Number(inp.value);
+      keys.forEach(function (room) {
+        var found = meterRooms.filter(function (r) { return r.房號 === room; })[0];
+        var last = found ? Number(found.上期度數) || 0 : 0;
+        var cur = Number(meterDraft[room]);
         var usage = cur - last;
         if (usage < 0) abnormal.push(room + '（本期' + cur + ' 小於上期' + last + '，用電量為負數）');
         else if (usage > 500) abnormal.push(room + '（用電量達 ' + usage + ' 度，請確認）');
         readings.push({ room: room, reading: cur });
       });
-      if (readings.length === 0) {
-        alert('請至少輸入一間房間的本期度數');
-        return;
-      }
       if (abnormal.length > 0) {
-        var go = confirm('以下房間數字可能異常，請再次確認：\n' + abnormal.join('\n') + '\n\n確定要照這些數字送出嗎？');
-        if (!go) return;
+        if (!confirm('以下房間數字可能異常，請再次確認：\n' + abnormal.join('\n') + '\n\n確定要照這些數字送出嗎？')) return;
       }
 
       var msg = document.getElementById('meterMsg');
@@ -788,11 +712,8 @@
         if (!res.ok) throw new Error('HTTP ' + res.status);
         return res.json();
       }).then(function (result) {
-        if (!result.success) {
-          msg.className = 'msg-err';
-          msg.innerText = '登錄失敗：' + result.message;
-          return;
-        }
+        if (!result.success) { msg.className = 'msg-err'; msg.innerText = '登錄失敗：' + result.message; return; }
+        meterDraft = {};
         try { localStorage.removeItem(METER_DRAFT_KEY); } catch (e) {}
         msg.className = 'msg-ok';
         var text = '已成功產生並寄出 Excel！共 ' + result.count + ' 戶（期別 ' + result.period + '）。';
@@ -800,12 +721,78 @@
           text += '\n⚠ ' + result.abnormalRooms.length + ' 筆用電量異常，已列在 Email 內容中，請特別檢查。';
         }
         msg.innerText = text;
-        document.getElementById('meterList').innerHTML = '';
-        document.getElementById('meterProgress').innerText = '';
+        renderMeterFilledList();
+        loadMeterRooms();
+      }).catch(function (err) { msg.className = 'msg-err'; msg.innerText = '送出失敗：' + err.message; });
+    }
+
+    // ---------- 租客資料維護 ----------
+
+    function loadTenantRoomOptions() {
+      callApi('getAllRooms').then(function (rooms) {
+        var select = document.getElementById('tenantRoomSelect');
+        select.innerHTML = '';
+        rooms.forEach(function (r) {
+          var opt = document.createElement('option');
+          opt.value = r.房號;
+          opt.innerText = r.房號 + (r.租戶姓名 ? ' ' + r.租戶姓名 : '（空房）');
+          select.appendChild(opt);
+        });
+        onTenantRoomChange();
       }).catch(function (err) {
-        msg.className = 'msg-err';
-        msg.innerText = '送出失敗：' + err.message;
+        document.getElementById('tenantRoomSelect').innerHTML = '<option>載入失敗：' + err.message + '</option>';
       });
+    }
+
+    function onTenantRoomChange() {
+      var room = document.getElementById('tenantRoomSelect').value;
+      if (!room) return;
+      callApi('getTenantInfo', { room: room }).then(function (info) {
+        tenantOriginal = info;
+        document.getElementById('tenantName').value = info ? info.租戶姓名 : '';
+        document.getElementById('tenantRent').value = info ? info.房屋租金 : '';
+        document.getElementById('tenantDeposit').value = info ? info.押金 : '';
+        document.getElementById('tenantMoveIn').value = info ? info.入住日期 : '';
+        document.getElementById('tenantPhone').value = info ? info.手機 : '';
+        var noteBox = document.getElementById('tenantCurrentInfo');
+        noteBox.innerText = (info && info.租戶姓名)
+          ? '目前已有租戶資料，修改後送出前會先列出異動內容供確認'
+          : '目前是空房，可直接填入新租客資料';
+      });
+    }
+
+    function submitTenantUpdate() {
+      var room = document.getElementById('tenantRoomSelect').value;
+      var name = document.getElementById('tenantName').value.trim();
+      var rent = document.getElementById('tenantRent').value;
+      var deposit = document.getElementById('tenantDeposit').value;
+      var moveIn = document.getElementById('tenantMoveIn').value;
+      var phone = document.getElementById('tenantPhone').value.trim();
+      var msg = document.getElementById('tenantMsg');
+
+      if (!room) { msg.className = 'msg-err'; msg.innerText = '請選擇房號'; return; }
+
+      var diffs = [];
+      if (tenantOriginal) {
+        if ((tenantOriginal.租戶姓名 || '') !== name) diffs.push('租戶姓名：' + (tenantOriginal.租戶姓名 || '（空）') + ' → ' + (name || '（空）'));
+        if (String(tenantOriginal.房屋租金 || '') !== String(rent || '')) diffs.push('房屋租金：' + (tenantOriginal.房屋租金 || 0) + ' → ' + (rent || 0));
+        if (String(tenantOriginal.押金 || '') !== String(deposit || '')) diffs.push('押金：' + (tenantOriginal.押金 || 0) + ' → ' + (deposit || 0));
+        if ((tenantOriginal.入住日期 || '') !== moveIn) diffs.push('入住日期：' + (tenantOriginal.入住日期 || '（空）') + ' → ' + (moveIn || '（空）'));
+        if ((tenantOriginal.手機 || '') !== phone) diffs.push('手機：' + (tenantOriginal.手機 || '（空）') + ' → ' + (phone || '（空）'));
+      } else {
+        diffs.push('（新增房號資料）');
+      }
+
+      if (diffs.length === 0) { msg.className = 'msg-err'; msg.innerText = '沒有欄位被修改'; return; }
+      if (!confirm('確定要送出以下變更嗎？\n\n' + diffs.join('\n'))) return;
+
+      callApi('updateTenant', { room: room, name: name, rent: rent, deposit: deposit, moveInDate: moveIn, phone: phone, userId: userId }).then(function (res) {
+        if (!res.success) { msg.className = 'msg-err'; msg.innerText = res.message; return; }
+        msg.className = 'msg-ok';
+        msg.innerText = '更新成功：\n' + diffs.join('\n');
+        loadRooms();
+        loadTenantRoomOptions();
+      }).catch(function (err) { msg.className = 'msg-err'; msg.innerText = '更新失敗：' + err.message; });
     }
   </script>
 </body>
