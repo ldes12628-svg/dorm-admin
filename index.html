@@ -151,27 +151,36 @@
     .arrears-detail-row { display: flex; justify-content: space-between; font-size: 12.5px; color: #888; padding: 3px 0; border-top: 1px dashed #eee; }
     .arrears-detail-row:first-of-type { border-top: none; margin-top: 4px; }
 
+    /* 三聯收據：平常隱藏，只有按「列印」時透過瀏覽器列印功能才會印出來 */
     #printArea { display: none; }
     @media print {
-      @page { size: A4; margin: 15mm; }
+      @page { size: A4; margin: 8mm; }
       body * { visibility: hidden; }
       #printArea, #printArea * { visibility: visible; }
-      #printArea { display: block; position: absolute; top: 0; left: 0; width: 100%; }
+      #printArea {
+        display: flex;
+        flex-direction: column;
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100vh;
+      }
       .receipt-copy {
-        page-break-after: always;
-        height: 90vh;
+        flex: 1;
+        border-bottom: 2px dashed #000;
+        padding: 10px 16px;
+        box-sizing: border-box;
         display: flex;
         flex-direction: column;
         justify-content: center;
-        padding: 30px 40px;
-        box-sizing: border-box;
       }
-      .receipt-copy:last-child { page-break-after: auto; }
-      .receipt-title { font-size: 26px; font-weight: bold; display: flex; justify-content: space-between; margin-bottom: 30px; border-bottom: 3px solid #000; padding-bottom: 14px; }
-      .receipt-row { display: flex; font-size: 19px; margin: 14px 0; }
-      .receipt-row .label { width: 140px; color: #333; }
+      .receipt-copy:last-child { border-bottom: none; }
+      .receipt-title { font-size: 15px; font-weight: bold; display: flex; justify-content: space-between; margin-bottom: 6px; border-bottom: 1px solid #000; padding-bottom: 4px; }
+      .receipt-row { display: flex; font-size: 12px; margin: 2px 0; }
+      .receipt-row .label { width: 75px; color: #333; }
       .receipt-row .value { flex: 1; font-weight: bold; }
-      .receipt-sign { margin-top: 60px; font-size: 17px; display: flex; justify-content: space-between; }
+      .receipt-sign { margin-top: 6px; font-size: 11px; display: flex; justify-content: space-between; }
     }
   </style>
 </head>
@@ -276,7 +285,7 @@
           <input id="tenantRent" type="number" placeholder="房屋租金">
           <input id="tenantFirstRent" type="number" placeholder="首月租金（若與一般月租不同才填）">
           <input id="tenantDeposit" type="number" placeholder="押金">
-          <select id="tenantWater"></select>
+          <input id="tenantWater" type="number" step="100" placeholder="水費（例如：100、200...）">
           <input id="tenantMoveIn" type="date">
           <input id="tenantPhone" placeholder="手機號碼">
           <textarea id="tenantNote" placeholder="備註（選填）" rows="2"></textarea>
@@ -419,22 +428,10 @@
 
     function showMain() {
       document.getElementById('mainScreen').style.display = 'block';
-      fillWaterSelect();
       loadPeriodOptions();
       loadRooms();
       loadMeterRooms();
       loadTenantRoomOptions();
-    }
-
-    function fillWaterSelect() {
-      var select = document.getElementById('tenantWater');
-      select.innerHTML = '';
-      for (var v = 0; v <= 2000; v += 100) {
-        var opt = document.createElement('option');
-        opt.value = v;
-        opt.innerText = v + ' 元';
-        select.appendChild(opt);
-      }
     }
 
     function loadPeriodOptions() {
@@ -443,7 +440,6 @@
         fillPeriodSelect('statusPeriodSelect', options);
         fillPeriodSelect('expensePeriodSelect', options);
         fillPeriodSelect('billPeriodSelect', options);
-        fillPeriodSelect('cashPeriodSelect', options);
         loadStatus();
         loadBills();
         var today = new Date();
@@ -451,6 +447,14 @@
         document.getElementById('expenseDate').value = y + '-' + m + '-' + d;
       }).catch(function (err) {
         document.getElementById('statusList').innerHTML = '<p style="color:#c00;">期別載入失敗：' + err.message + '</p>';
+      });
+
+      // 現金收款期別範圍從更早的期別開始（跟欠費彙總同一個下限），方便補收舊欠款
+      callApi('getCashPeriodOptions').then(function (cashOptions) {
+        fillPeriodSelect('cashPeriodSelect', cashOptions);
+        showRoomDue();
+      }).catch(function (err) {
+        document.getElementById('roomDueInfo').innerText = '收款期別載入失敗：' + err.message;
       });
     }
 
@@ -518,7 +522,7 @@
       var room = document.getElementById('roomSelect').value;
       var period = document.getElementById('cashPeriodSelect').value;
       var info = document.getElementById('roomDueInfo');
-      if (!room) { info.innerText = ''; return; }
+      if (!room || !period) { info.innerText = ''; return; }
       info.innerText = '查詢中…';
       callApi('getPaymentStatus', { period: period }).then(function (list) {
         var found = list.filter(function (r) { return r.房號 === room; })[0];
@@ -859,7 +863,7 @@
         document.getElementById('tenantRent').value = info ? info.房屋租金 : '';
         document.getElementById('tenantFirstRent').value = info ? info.首月租金 : '';
         document.getElementById('tenantDeposit').value = info ? info.押金 : '';
-        document.getElementById('tenantWater').value = info && info.水費 !== '' ? info.水費 : 0;
+        document.getElementById('tenantWater').value = info ? info.水費 : '';
         document.getElementById('tenantMoveIn').value = info ? info.入住日期 : '';
         document.getElementById('tenantPhone').value = info ? info.手機 : '';
         document.getElementById('tenantNote').value = info ? info.備註 : '';
@@ -890,7 +894,7 @@
         if (String(tenantOriginal.房屋租金 || '') !== String(rent || '')) diffs.push('房屋租金：' + (tenantOriginal.房屋租金 || 0) + ' → ' + (rent || 0));
         if (String(tenantOriginal.首月租金 || '') !== String(firstRent || '')) diffs.push('首月租金：' + (tenantOriginal.首月租金 || 0) + ' → ' + (firstRent || 0));
         if (String(tenantOriginal.押金 || '') !== String(deposit || '')) diffs.push('押金：' + (tenantOriginal.押金 || 0) + ' → ' + (deposit || 0));
-        if (String(tenantOriginal.水費 || '0') !== String(water || '0')) diffs.push('水費：' + (tenantOriginal.水費 || 0) + ' → ' + (water || 0));
+        if (String(tenantOriginal.水費 || '') !== String(water || '')) diffs.push('水費：' + (tenantOriginal.水費 || 0) + ' → ' + (water || 0));
         if ((tenantOriginal.入住日期 || '') !== moveIn) diffs.push('入住日期：' + (tenantOriginal.入住日期 || '（空）') + ' → ' + (moveIn || '（空）'));
         if ((tenantOriginal.手機 || '') !== phone) diffs.push('手機：' + (tenantOriginal.手機 || '（空）') + ' → ' + (phone || '（空）'));
         if ((tenantOriginal.備註 || '') !== note) diffs.push('備註：' + (tenantOriginal.備註 || '（空）') + ' → ' + (note || '（空）'));
