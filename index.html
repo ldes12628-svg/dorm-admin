@@ -63,6 +63,7 @@
       transition: opacity 0.15s;
     }
     button:active { opacity: 0.75; }
+    button:disabled { background: #a9d9bd; }
     button.secondary { background: #eceef1; color: #444; }
     button.small { width: auto; padding: 5px 10px; font-size: 12.5px; margin: 0; }
 
@@ -152,16 +153,25 @@
 
     #printArea { display: none; }
     @media print {
+      @page { size: A4; margin: 15mm; }
       body * { visibility: hidden; }
       #printArea, #printArea * { visibility: visible; }
       #printArea { display: block; position: absolute; top: 0; left: 0; width: 100%; }
-      .receipt-copy { page-break-inside: avoid; border-bottom: 1px dashed #000; padding: 12px 16px; box-sizing: border-box; }
-      .receipt-copy:last-child { border-bottom: none; }
-      .receipt-title { font-size: 14px; font-weight: bold; display: flex; justify-content: space-between; margin-bottom: 6px; }
-      .receipt-row { display: flex; font-size: 12px; margin: 3px 0; }
-      .receipt-row .label { width: 70px; color: #333; }
+      .receipt-copy {
+        page-break-after: always;
+        height: 90vh;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        padding: 30px 40px;
+        box-sizing: border-box;
+      }
+      .receipt-copy:last-child { page-break-after: auto; }
+      .receipt-title { font-size: 26px; font-weight: bold; display: flex; justify-content: space-between; margin-bottom: 30px; border-bottom: 3px solid #000; padding-bottom: 14px; }
+      .receipt-row { display: flex; font-size: 19px; margin: 14px 0; }
+      .receipt-row .label { width: 140px; color: #333; }
       .receipt-row .value { flex: 1; font-weight: bold; }
-      .receipt-sign { margin-top: 10px; font-size: 12px; display: flex; justify-content: space-between; }
+      .receipt-sign { margin-top: 60px; font-size: 17px; display: flex; justify-content: space-between; }
     }
   </style>
 </head>
@@ -235,7 +245,8 @@
           <select id="cashPeriodSelect" onchange="showRoomDue()"></select>
           <div id="roomDueInfo"></div>
           <input id="amountInput" type="number" placeholder="收款金額">
-          <button onclick="submitCash()">確認收款並產生收據</button>
+          <textarea id="cashNoteInput" placeholder="備註（選填）" rows="2"></textarea>
+          <button id="cashSubmitBtn" onclick="submitCash()">確認收款並產生收據</button>
           <div id="receiptResult"></div>
         </div>
       </div>
@@ -263,9 +274,12 @@
           <div id="tenantCurrentInfo"></div>
           <input id="tenantName" placeholder="租戶姓名">
           <input id="tenantRent" type="number" placeholder="房屋租金">
+          <input id="tenantFirstRent" type="number" placeholder="首月租金（若與一般月租不同才填）">
           <input id="tenantDeposit" type="number" placeholder="押金">
+          <select id="tenantWater"></select>
           <input id="tenantMoveIn" type="date">
           <input id="tenantPhone" placeholder="手機號碼">
+          <textarea id="tenantNote" placeholder="備註（選填）" rows="2"></textarea>
           <button onclick="submitTenantUpdate()">更新房客資料</button>
           <p id="tenantMsg"></p>
         </div>
@@ -283,6 +297,7 @@
       <div class="receipt-row"><span class="label">本次收款</span><span class="value" id="p-amount-1"></span></div>
       <div class="receipt-row"><span class="label">日期</span><span class="value" id="p-date-1"></span></div>
       <div class="receipt-row"><span class="label">繳費狀態</span><span class="value" id="p-note-1"></span></div>
+      <div class="receipt-row"><span class="label">備註</span><span class="value" id="p-usernote-1"></span></div>
       <div class="receipt-sign"><span>開立人：管理員</span><span>簽章：__________</span></div>
     </div>
     <div class="receipt-copy">
@@ -293,6 +308,7 @@
       <div class="receipt-row"><span class="label">本次收款</span><span class="value" id="p-amount-2"></span></div>
       <div class="receipt-row"><span class="label">日期</span><span class="value" id="p-date-2"></span></div>
       <div class="receipt-row"><span class="label">繳費狀態</span><span class="value" id="p-note-2"></span></div>
+      <div class="receipt-row"><span class="label">備註</span><span class="value" id="p-usernote-2"></span></div>
       <div class="receipt-sign"><span>開立人：管理員</span><span>簽章：__________</span></div>
     </div>
     <div class="receipt-copy">
@@ -303,6 +319,7 @@
       <div class="receipt-row"><span class="label">本次收款</span><span class="value" id="p-amount-3"></span></div>
       <div class="receipt-row"><span class="label">日期</span><span class="value" id="p-date-3"></span></div>
       <div class="receipt-row"><span class="label">繳費狀態</span><span class="value" id="p-note-3"></span></div>
+      <div class="receipt-row"><span class="label">備註</span><span class="value" id="p-usernote-3"></span></div>
       <div class="receipt-sign"><span>開立人：管理員</span><span>簽章：__________</span></div>
     </div>
   </div>
@@ -321,6 +338,8 @@
     var meterRooms = [];
     var meterDraft = {};
     var tenantOriginal = null;
+    var arrearsData = [];
+    var isSubmittingCash = false;
 
     window.onerror = function (msg, url, line) {
       document.getElementById('status').style.display = 'block';
@@ -400,10 +419,22 @@
 
     function showMain() {
       document.getElementById('mainScreen').style.display = 'block';
+      fillWaterSelect();
       loadPeriodOptions();
       loadRooms();
       loadMeterRooms();
       loadTenantRoomOptions();
+    }
+
+    function fillWaterSelect() {
+      var select = document.getElementById('tenantWater');
+      select.innerHTML = '';
+      for (var v = 0; v <= 2000; v += 100) {
+        var opt = document.createElement('option');
+        opt.value = v;
+        opt.innerText = v + ' 元';
+        select.appendChild(opt);
+      }
     }
 
     function loadPeriodOptions() {
@@ -555,55 +586,64 @@
       }).join('');
     }
 
-    var arrearsData = [];
+    function loadArrears() {
+      var box = document.getElementById('arrearsList');
+      box.innerHTML = '查詢中…（需逐期彙整，可能需要幾秒）';
+      callApi('getArrearsSummary').then(function (list) {
+        arrearsData = list;
+        renderArrearsFiltered();
+      }).catch(function (err) {
+        box.innerHTML = '<p style="color:#c00;">查詢失敗：' + err.message + '</p>';
+      });
+    }
 
-   function loadArrears() {
-     var box = document.getElementById('arrearsList');
-     box.innerHTML = '查詢中…（需逐期彙整，可能需要幾秒）';
-     callApi('getArrearsSummary').then(function (list) {
-       arrearsData = list;
-       renderArrearsFiltered();
-     }).catch(function (err) {
-       box.innerHTML = '<p style="color:#c00;">查詢失敗：' + err.message + '</p>';
-     });
-   }
+    function renderArrearsFiltered() {
+      var keyword = document.getElementById('arrearsSearch').value.trim();
+      var box = document.getElementById('arrearsList');
+      if (arrearsData.length === 0) {
+        box.innerHTML = '<div class="card"><p>目前沒有任何房號有欠款 🎉</p></div>';
+        return;
+      }
+      var list = keyword
+        ? arrearsData.filter(function (r) {
+            return String(r.房號).indexOf(keyword) !== -1 || String(r.租戶姓名).indexOf(keyword) !== -1;
+          })
+        : arrearsData;
+      if (list.length === 0) {
+        box.innerHTML = '<div class="card"><p>沒有符合「' + keyword + '」的房號</p></div>';
+        return;
+      }
+      box.innerHTML = list.map(function (r) {
+        var detailHtml = r.明細.map(function (d) {
+          return '<div class="arrears-detail-row"><span>' + d.期別 + '（' + d.狀態 + '）</span><span>' + d.尚欠金額 + ' 元</span></div>';
+        }).join('');
+        return '<div class="arrears-card">' +
+          '<h3><span>' + r.房號 + ' ' + r.租戶姓名 + '</span><span class="arrears-total">共欠 ' + r.總欠款 + ' 元</span></h3>' +
+          detailHtml +
+          '</div>';
+      }).join('');
+    }
 
-   function renderArrearsFiltered() {
-     var keyword = document.getElementById('arrearsSearch').value.trim();
-     var box = document.getElementById('arrearsList');
-     if (arrearsData.length === 0) {
-       box.innerHTML = '<div class="card"><p>目前沒有任何房號有欠款 🎉</p></div>';
-       return;
-     }
-     var list = keyword
-       ? arrearsData.filter(function (r) {
-           return String(r.房號).indexOf(keyword) !== -1 || String(r.租戶姓名).indexOf(keyword) !== -1;
-         })
-       : arrearsData;
-     if (list.length === 0) {
-       box.innerHTML = '<div class="card"><p>沒有符合「' + keyword + '」的房號</p></div>';
-       return;
-     }
-     box.innerHTML = list.map(function (r) {
-       var detailHtml = r.明細.map(function (d) {
-         return '<div class="arrears-detail-row"><span>' + d.期別 + '（' + d.狀態 + '）</span><span>' + d.尚欠金額 + ' 元</span></div>';
-       }).join('');
-       return '<div class="arrears-card">' +
-         '<h3><span>' + r.房號 + ' ' + r.租戶姓名 + '</span><span class="arrears-total">共欠 ' + r.總欠款 + ' 元</span></h3>' +
-         detailHtml +
-         '</div>';
-     }).join('');
-   }
-          
     function submitCash() {
+      if (isSubmittingCash) return; // 防止重複點擊送出兩次
       var room = document.getElementById('roomSelect').value;
       var period = document.getElementById('cashPeriodSelect').value;
       var amount = document.getElementById('amountInput').value;
+      var note = document.getElementById('cashNoteInput').value.trim();
       if (!room || !amount) { alert('請選擇房號並輸入金額'); return; }
-      callApi('submitCashPayment', { room: room, amount: amount, userId: userId, period: period }).then(function (res) {
+
+      isSubmittingCash = true;
+      var btn = document.getElementById('cashSubmitBtn');
+      btn.disabled = true;
+      btn.innerText = '處理中，請稍候…';
+
+      callApi('submitCashPayment', { room: room, amount: amount, userId: userId, period: period, note: note }).then(function (res) {
+        isSubmittingCash = false;
+        btn.disabled = false;
+        btn.innerText = '確認收款並產生收據';
         if (!res.success) { alert(res.message); return; }
         var isPartial = res.狀態 === '部分繳款';
-        var note = isPartial ? '部分繳款，尚欠 ' + res.尚欠金額 + ' 元' : '已全額結清';
+        var noteText = isPartial ? '部分繳款，尚欠 ' + res.尚欠金額 + ' 元' : '已全額結清';
 
         var box = document.getElementById('receiptResult');
         box.className = isPartial ? 'partial' : '';
@@ -612,21 +652,29 @@
           '<p>收據編號：' + res.receiptNo + '</p>' +
           '<p>時間：' + res.date + '</p>' +
           '<p>本次收款：' + res.本次收款 + ' 元｜累計已收：' + res.累計已收 + ' 元' + (res.應繳金額 != null ? '｜應繳：' + res.應繳金額 + ' 元' : '') + '</p>' +
-          '<p class="r-note">' + note + '</p>' +
-          '<button onclick="printReceipt(\'' + res.receiptNo + '\',\'' + res.period + '\',\'' + room + '\',\'' + res.本次收款 + '\',\'' + res.date + '\',\'' + note + '\')">列印三聯收據</button>' +
+          '<p class="r-note">' + noteText + '</p>' +
+          (res.備註 ? '<p>備註：' + res.備註 + '</p>' : '') +
+          '<button onclick="printReceipt(\'' + res.receiptNo + '\',\'' + res.period + '\',\'' + room + '\',\'' + res.本次收款 + '\',\'' + res.date + '\',\'' + noteText + '\',\'' + (res.備註 || '') + '\')">列印三聯收據</button>' +
           '<button class="secondary" onclick="location.reload()">完成，繼續下一筆</button>';
         document.getElementById('amountInput').value = '';
-      }).catch(function (err) { alert('登錄失敗：' + err.message); });
+        document.getElementById('cashNoteInput').value = '';
+      }).catch(function (err) {
+        isSubmittingCash = false;
+        btn.disabled = false;
+        btn.innerText = '確認收款並產生收據';
+        alert('登錄失敗：' + err.message);
+      });
     }
 
-    function printReceipt(no, period, room, amount, date, note) {
+    function printReceipt(no, period, room, amount, date, statusNote, userNote) {
       for (var i = 1; i <= 3; i++) {
         document.getElementById('p-no-' + i).innerText = no;
         document.getElementById('p-period-' + i).innerText = period;
         document.getElementById('p-room-' + i).innerText = room;
         document.getElementById('p-amount-' + i).innerText = amount + ' 元';
         document.getElementById('p-date-' + i).innerText = date;
-        document.getElementById('p-note-' + i).innerText = note || '已全額結清';
+        document.getElementById('p-note-' + i).innerText = statusNote || '已全額結清';
+        document.getElementById('p-usernote-' + i).innerText = userNote || '（無）';
       }
       window.print();
     }
@@ -809,9 +857,12 @@
         tenantOriginal = info;
         document.getElementById('tenantName').value = info ? info.租戶姓名 : '';
         document.getElementById('tenantRent').value = info ? info.房屋租金 : '';
+        document.getElementById('tenantFirstRent').value = info ? info.首月租金 : '';
         document.getElementById('tenantDeposit').value = info ? info.押金 : '';
+        document.getElementById('tenantWater').value = info && info.水費 !== '' ? info.水費 : 0;
         document.getElementById('tenantMoveIn').value = info ? info.入住日期 : '';
         document.getElementById('tenantPhone').value = info ? info.手機 : '';
+        document.getElementById('tenantNote').value = info ? info.備註 : '';
         var noteBox = document.getElementById('tenantCurrentInfo');
         noteBox.innerText = (info && info.租戶姓名)
           ? '目前已有租戶資料，修改後送出前會先列出異動內容供確認'
@@ -823,9 +874,12 @@
       var room = document.getElementById('tenantRoomSelect').value;
       var name = document.getElementById('tenantName').value.trim();
       var rent = document.getElementById('tenantRent').value;
+      var firstRent = document.getElementById('tenantFirstRent').value;
       var deposit = document.getElementById('tenantDeposit').value;
+      var water = document.getElementById('tenantWater').value;
       var moveIn = document.getElementById('tenantMoveIn').value;
       var phone = document.getElementById('tenantPhone').value.trim();
+      var note = document.getElementById('tenantNote').value.trim();
       var msg = document.getElementById('tenantMsg');
 
       if (!room) { msg.className = 'msg-err'; msg.innerText = '請選擇房號'; return; }
@@ -834,9 +888,12 @@
       if (tenantOriginal) {
         if ((tenantOriginal.租戶姓名 || '') !== name) diffs.push('租戶姓名：' + (tenantOriginal.租戶姓名 || '（空）') + ' → ' + (name || '（空）'));
         if (String(tenantOriginal.房屋租金 || '') !== String(rent || '')) diffs.push('房屋租金：' + (tenantOriginal.房屋租金 || 0) + ' → ' + (rent || 0));
+        if (String(tenantOriginal.首月租金 || '') !== String(firstRent || '')) diffs.push('首月租金：' + (tenantOriginal.首月租金 || 0) + ' → ' + (firstRent || 0));
         if (String(tenantOriginal.押金 || '') !== String(deposit || '')) diffs.push('押金：' + (tenantOriginal.押金 || 0) + ' → ' + (deposit || 0));
+        if (String(tenantOriginal.水費 || '0') !== String(water || '0')) diffs.push('水費：' + (tenantOriginal.水費 || 0) + ' → ' + (water || 0));
         if ((tenantOriginal.入住日期 || '') !== moveIn) diffs.push('入住日期：' + (tenantOriginal.入住日期 || '（空）') + ' → ' + (moveIn || '（空）'));
         if ((tenantOriginal.手機 || '') !== phone) diffs.push('手機：' + (tenantOriginal.手機 || '（空）') + ' → ' + (phone || '（空）'));
+        if ((tenantOriginal.備註 || '') !== note) diffs.push('備註：' + (tenantOriginal.備註 || '（空）') + ' → ' + (note || '（空）'));
       } else {
         diffs.push('（新增房號資料）');
       }
@@ -844,7 +901,10 @@
       if (diffs.length === 0) { msg.className = 'msg-err'; msg.innerText = '沒有欄位被修改'; return; }
       if (!confirm('確定要送出以下變更嗎？\n\n' + diffs.join('\n'))) return;
 
-      callApi('updateTenant', { room: room, name: name, rent: rent, deposit: deposit, moveInDate: moveIn, phone: phone, userId: userId }).then(function (res) {
+      callApi('updateTenant', {
+        room: room, name: name, rent: rent, deposit: deposit, moveInDate: moveIn,
+        phone: phone, water: water, note: note, firstRent: firstRent, userId: userId
+      }).then(function (res) {
         if (!res.success) { msg.className = 'msg-err'; msg.innerText = res.message; return; }
         msg.className = 'msg-ok';
         msg.innerText = '更新成功：\n' + diffs.join('\n');
