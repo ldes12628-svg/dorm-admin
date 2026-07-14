@@ -151,7 +151,6 @@
     .arrears-detail-row { display: flex; justify-content: space-between; font-size: 12.5px; color: #888; padding: 3px 0; border-top: 1px dashed #eee; }
     .arrears-detail-row:first-of-type { border-top: none; margin-top: 4px; }
 
-    /* 三聯收據：平常隱藏，只有按「列印」時透過瀏覽器列印功能才會印出來 */
     #printArea { display: none; }
     @media print {
       @page { size: A4; margin: 8mm; }
@@ -248,6 +247,14 @@
       </div>
 
       <div class="acc">
+        <div class="acc-header" onclick="toggleSection('reminderBody')">🔔 半年繳提醒 <span class="acc-arrow" id="reminderBody-arrow">▸</span></div>
+        <div class="acc-content" id="reminderBody">
+          <button class="secondary" onclick="loadReminders()">重新整理提醒清單</button>
+          <div id="reminderList" style="margin-top:8px;"></div>
+        </div>
+      </div>
+
+      <div class="acc">
         <div class="acc-header" onclick="toggleSection('cashBody')">💵 現金收款登錄 <span class="acc-arrow" id="cashBody-arrow">▸</span></div>
         <div class="acc-content" id="cashBody">
           <select id="roomSelect" onchange="showRoomDue()"></select>
@@ -289,6 +296,8 @@
           <input id="tenantMoveIn" type="date">
           <input id="tenantPhone" placeholder="手機號碼">
           <textarea id="tenantNote" placeholder="備註（選填）" rows="2"></textarea>
+          <input id="tenantNextDue" type="date">
+          <label class="checkline" style="margin-top:-4px;">↑ 下次收費日期（半年繳/季繳等非按月繳費才需要填）</label>
           <button onclick="submitTenantUpdate()">更新房客資料</button>
           <p id="tenantMsg"></p>
         </div>
@@ -449,7 +458,6 @@
         document.getElementById('statusList').innerHTML = '<p style="color:#c00;">期別載入失敗：' + err.message + '</p>';
       });
 
-      // 現金收款期別範圍從更早的期別開始（跟欠費彙總同一個下限），方便補收舊欠款
       callApi('getCashPeriodOptions').then(function (cashOptions) {
         fillPeriodSelect('cashPeriodSelect', cashOptions);
         showRoomDue();
@@ -628,8 +636,28 @@
       }).join('');
     }
 
+    function loadReminders() {
+      var box = document.getElementById('reminderList');
+      box.innerHTML = '查詢中…';
+      callApi('getSemiAnnualReminders').then(function (list) {
+        if (list.length === 0) {
+          box.innerHTML = '<div class="card"><p>目前沒有即將到期的半年繳房客 🎉</p></div>';
+          return;
+        }
+        box.innerHTML = list.map(function (r) {
+          var tag = r.剩餘天數 < 0
+            ? '<span class="badge s-unpaid">已逾期 ' + Math.abs(r.剩餘天數) + ' 天</span>'
+            : '<span class="badge s-partial">還有 ' + r.剩餘天數 + ' 天</span>';
+          return '<div class="status-row"><div class="row-top"><span>' + r.房號 + ' ' + r.租戶姓名 +
+            '　到期日 ' + r.到期日 + '</span>' + tag + '</div></div>';
+        }).join('');
+      }).catch(function (err) {
+        box.innerHTML = '<p style="color:#c00;">查詢失敗：' + err.message + '</p>';
+      });
+    }
+
     function submitCash() {
-      if (isSubmittingCash) return; // 防止重複點擊送出兩次
+      if (isSubmittingCash) return;
       var room = document.getElementById('roomSelect').value;
       var period = document.getElementById('cashPeriodSelect').value;
       var amount = document.getElementById('amountInput').value;
@@ -867,6 +895,7 @@
         document.getElementById('tenantMoveIn').value = info ? info.入住日期 : '';
         document.getElementById('tenantPhone').value = info ? info.手機 : '';
         document.getElementById('tenantNote').value = info ? info.備註 : '';
+        document.getElementById('tenantNextDue').value = info ? info.下次收費日期 : '';
         var noteBox = document.getElementById('tenantCurrentInfo');
         noteBox.innerText = (info && info.租戶姓名)
           ? '目前已有租戶資料，修改後送出前會先列出異動內容供確認'
@@ -884,6 +913,7 @@
       var moveIn = document.getElementById('tenantMoveIn').value;
       var phone = document.getElementById('tenantPhone').value.trim();
       var note = document.getElementById('tenantNote').value.trim();
+      var nextDue = document.getElementById('tenantNextDue').value;
       var msg = document.getElementById('tenantMsg');
 
       if (!room) { msg.className = 'msg-err'; msg.innerText = '請選擇房號'; return; }
@@ -898,6 +928,7 @@
         if ((tenantOriginal.入住日期 || '') !== moveIn) diffs.push('入住日期：' + (tenantOriginal.入住日期 || '（空）') + ' → ' + (moveIn || '（空）'));
         if ((tenantOriginal.手機 || '') !== phone) diffs.push('手機：' + (tenantOriginal.手機 || '（空）') + ' → ' + (phone || '（空）'));
         if ((tenantOriginal.備註 || '') !== note) diffs.push('備註：' + (tenantOriginal.備註 || '（空）') + ' → ' + (note || '（空）'));
+        if ((tenantOriginal.下次收費日期 || '') !== nextDue) diffs.push('下次收費日期：' + (tenantOriginal.下次收費日期 || '（空）') + ' → ' + (nextDue || '（空）'));
       } else {
         diffs.push('（新增房號資料）');
       }
@@ -907,7 +938,7 @@
 
       callApi('updateTenant', {
         room: room, name: name, rent: rent, deposit: deposit, moveInDate: moveIn,
-        phone: phone, water: water, note: note, firstRent: firstRent, userId: userId
+        phone: phone, water: water, note: note, firstRent: firstRent, nextDueDate: nextDue, userId: userId
       }).then(function (res) {
         if (!res.success) { msg.className = 'msg-err'; msg.innerText = res.message; return; }
         msg.className = 'msg-ok';
