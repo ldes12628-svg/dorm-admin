@@ -262,6 +262,8 @@
           <div id="roomDueInfo"></div>
           <input id="amountInput" type="number" placeholder="收款金額">
           <textarea id="cashNoteInput" placeholder="備註（選填）" rows="2"></textarea>
+          <input type="file" id="cashPhotoInput" accept="image/*" onchange="onCashPhotoSelected(this)">
+          <div id="cashPhotoStatus" style="font-size:12px; color:#888; margin:-2px 0 6px;"></div>
           <button id="cashSubmitBtn" onclick="submitCash()">確認收款並產生收據</button>
           <div id="receiptResult"></div>
         </div>
@@ -275,11 +277,22 @@
           <input id="expenseItem" placeholder="支出項目（例如：水電修繕）">
           <input id="expenseAmount" type="number" placeholder="金額">
           <textarea id="expenseNote" placeholder="備註（選填）" rows="2"></textarea>
+          <input type="file" id="expensePhotoInput" accept="image/*" onchange="onExpensePhotoSelected(this)">
+          <div id="expensePhotoStatus" style="font-size:12px; color:#888; margin:-2px 0 6px;"></div>
           <button onclick="submitExpense()">登錄支出</button>
           <p id="expenseMsg"></p>
           <button class="secondary" onclick="loadExpenses()">查詢本期支出</button>
           <div id="expenseList" style="margin-top:8px;"></div>
           <div id="expenseTotal"></div>
+        </div>
+      </div>
+
+      <div class="acc">
+        <div class="acc-header" onclick="toggleSection('rosterBody')">📇 租戶名冊 <span class="acc-arrow" id="rosterBody-arrow">▸</span></div>
+        <div class="acc-content" id="rosterBody">
+          <button class="secondary" onclick="loadTenantRoster()">重新整理名冊</button>
+          <input id="rosterSearch" placeholder="輸入房號或租戶姓名查詢" oninput="renderRosterFiltered()">
+          <div id="rosterList" style="margin-top:8px;"></div>
         </div>
       </div>
 
@@ -358,6 +371,9 @@
     var tenantOriginal = null;
     var arrearsData = [];
     var isSubmittingCash = false;
+    var cashPhotoUrl = '';
+    var expensePhotoUrl = '';
+    var rosterData = [];
 
     window.onerror = function (msg, url, line) {
       document.getElementById('status').style.display = 'block';
@@ -508,6 +524,7 @@
       list.innerHTML = bills.map(function (b) {
         return '<div class="card">' +
           '<h3>' + b.房號 + ' ' + b.租戶姓名 + '</h3>' +
+          '<p>上期度數：' + b.上期用電度 + '　→　本期度數：' + b.本期用電度 + '</p>' +
           '<p>電費：' + b.電費 + ' 元｜水費：' + b.水費 + ' 元｜應繳：' + b.應繳金額 + ' 元</p>' +
           '<button onclick="shareBill(\'' + b.房號 + '\', \'' + (b.繳費單圖片網址 || '') + '\')">轉發給租戶</button>' +
           '</div>';
@@ -627,7 +644,8 @@
       }
       box.innerHTML = list.map(function (r) {
         var detailHtml = r.明細.map(function (d) {
-          return '<div class="arrears-detail-row"><span>' + d.期別 + '（' + d.狀態 + '）</span><span>' + d.尚欠金額 + ' 元</span></div>';
+          var typeTag = d.類型 ? '｜' + d.類型 : '';
+          return '<div class="arrears-detail-row"><span>' + d.期別 + '（' + d.狀態 + typeTag + '）</span><span>' + d.尚欠金額 + ' 元</span></div>';
         }).join('');
         return '<div class="arrears-card">' +
           '<h3><span>' + r.房號 + ' ' + r.租戶姓名 + '</span><span class="arrears-total">共欠 ' + r.總欠款 + ' 元</span></h3>' +
@@ -656,6 +674,83 @@
       });
     }
 
+    // ---------- 照片上傳（收款/支出共用） ----------
+
+    function fileToBase64_(file) {
+      return new Promise(function (resolve, reject) {
+        var reader = new FileReader();
+        reader.onload = function () { resolve(reader.result.split(',')[1]); };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function uploadPhotoFile_(file, statusElId, onDone) {
+      var statusEl = document.getElementById(statusElId);
+      statusEl.innerText = '上傳中…';
+      fileToBase64_(file).then(function (base64) {
+        return fetch(API_BASE, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({ action: 'uploadPhoto', base64: base64, mimeType: file.type, fileName: file.name })
+        });
+      }).then(function (res) { return res.json(); }).then(function (result) {
+        if (result.success) {
+          statusEl.innerText = '✓ 已上傳照片';
+          onDone(result.url);
+        } else {
+          statusEl.innerText = '上傳失敗：' + result.message;
+        }
+      }).catch(function (err) {
+        statusEl.innerText = '上傳失敗：' + err.message;
+      });
+    }
+
+    function onCashPhotoSelected(input) {
+      if (!input.files || !input.files[0]) return;
+      cashPhotoUrl = '';
+      uploadPhotoFile_(input.files[0], 'cashPhotoStatus', function (url) { cashPhotoUrl = url; });
+    }
+
+    function onExpensePhotoSelected(input) {
+      if (!input.files || !input.files[0]) return;
+      expensePhotoUrl = '';
+      uploadPhotoFile_(input.files[0], 'expensePhotoStatus', function (url) { expensePhotoUrl = url; });
+    }
+
+    // ---------- 租戶名冊 ----------
+
+    function loadTenantRoster() {
+      var box = document.getElementById('rosterList');
+      box.innerHTML = '查詢中…';
+      callApi('getTenantRoster').then(function (list) {
+        rosterData = list;
+        renderRosterFiltered();
+      }).catch(function (err) {
+        box.innerHTML = '<p style="color:#c00;">查詢失敗：' + err.message + '</p>';
+      });
+    }
+
+    function renderRosterFiltered() {
+      var keyword = document.getElementById('rosterSearch').value.trim();
+      var box = document.getElementById('rosterList');
+      if (rosterData.length === 0) { box.innerHTML = '<div class="card"><p>尚未載入名冊，請先點「重新整理名冊」</p></div>'; return; }
+      var list = keyword
+        ? rosterData.filter(function (t) {
+            return String(t.房號).indexOf(keyword) !== -1 || String(t.租戶姓名).indexOf(keyword) !== -1;
+          })
+        : rosterData;
+      if (list.length === 0) { box.innerHTML = '<div class="card"><p>沒有符合「' + keyword + '」的房號</p></div>'; return; }
+      box.innerHTML = list.map(function (t) {
+        var occ = t.租戶姓名 ? t.租戶姓名 : '（空房）';
+        return '<div class="card">' +
+          '<h3>' + t.房號 + ' ' + occ + '</h3>' +
+          '<p>房租：' + t.房屋租金 + ' 元｜水費：' + t.水費 + ' 元｜押金：' + t.押金 + ' 元</p>' +
+          '<p>手機：' + (t.手機 || '（無）') + (t.備註 ? '｜備註：' + t.備註 : '') + '</p>' +
+          '</div>';
+      }).join('');
+    }
+
     function submitCash() {
       if (isSubmittingCash) return;
       var room = document.getElementById('roomSelect').value;
@@ -669,7 +764,7 @@
       btn.disabled = true;
       btn.innerText = '處理中，請稍候…';
 
-      callApi('submitCashPayment', { room: room, amount: amount, userId: userId, period: period, note: note }).then(function (res) {
+      callApi('submitCashPayment', { room: room, amount: amount, userId: userId, period: period, note: note, photoUrl: cashPhotoUrl }).then(function (res) {
         isSubmittingCash = false;
         btn.disabled = false;
         btn.innerText = '確認收款並產生收據';
@@ -686,10 +781,14 @@
           '<p>本次收款：' + res.本次收款 + ' 元｜累計已收：' + res.累計已收 + ' 元' + (res.應繳金額 != null ? '｜應繳：' + res.應繳金額 + ' 元' : '') + '</p>' +
           '<p class="r-note">' + noteText + '</p>' +
           (res.備註 ? '<p>備註：' + res.備註 + '</p>' : '') +
+          (res.照片網址 ? '<p><a href="' + res.照片網址 + '" target="_blank">查看已上傳照片</a></p>' : '') +
           '<button onclick="printReceipt(\'' + res.receiptNo + '\',\'' + res.period + '\',\'' + room + '\',\'' + res.本次收款 + '\',\'' + res.date + '\',\'' + noteText + '\',\'' + (res.備註 || '') + '\')">列印三聯收據</button>' +
           '<button class="secondary" onclick="location.reload()">完成，繼續下一筆</button>';
         document.getElementById('amountInput').value = '';
         document.getElementById('cashNoteInput').value = '';
+        document.getElementById('cashPhotoInput').value = '';
+        document.getElementById('cashPhotoStatus').innerText = '';
+        cashPhotoUrl = '';
       }).catch(function (err) {
         isSubmittingCash = false;
         btn.disabled = false;
