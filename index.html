@@ -820,13 +820,16 @@
 
       if (!item || !amount) { msg.className = 'msg-err'; msg.innerText = '請輸入項目名稱與金額'; return; }
 
-      callApi('submitExpense', { period: period, date: date, item: item, amount: amount, note: note, userId: userId }).then(function (res) {
+      callApi('submitExpense', { period: period, date: date, item: item, amount: amount, note: note, userId: userId, photoUrl: expensePhotoUrl }).then(function (res) {
         if (!res.success) { msg.className = 'msg-err'; msg.innerText = res.message; return; }
         msg.className = 'msg-ok';
         msg.innerText = '登錄成功：' + res.item + ' ' + res.amount + ' 元';
         document.getElementById('expenseItem').value = '';
         document.getElementById('expenseAmount').value = '';
         document.getElementById('expenseNote').value = '';
+        document.getElementById('expensePhotoInput').value = '';
+        document.getElementById('expensePhotoStatus').innerText = '';
+        expensePhotoUrl = '';
         loadExpenses();
       }).catch(function (err) { msg.className = 'msg-err'; msg.innerText = '登錄失敗：' + err.message; });
     }
@@ -842,7 +845,9 @@
         box.innerHTML = res.items.map(function (e) {
           return '<div class="expense-row">' +
             '<div><div class="e-item">' + e.日期 + ' ' + e.項目 + '</div>' +
-            (e.備註 ? '<div class="e-note">' + e.備註 + '</div>' : '') + '</div>' +
+            (e.備註 ? '<div class="e-note">' + e.備註 + '</div>' : '') +
+            (e.照片網址 ? '<div class="e-note"><a href="' + e.照片網址 + '" target="_blank">查看照片</a></div>' : '') +
+            '</div>' +
             '<div class="e-amount">' + e.金額 + ' 元</div>' +
             '</div>';
         }).join('');
