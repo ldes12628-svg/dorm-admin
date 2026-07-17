@@ -288,6 +288,36 @@
       </div>
 
       <div class="acc">
+        <div class="acc-header" onclick="toggleSection('elecHistoryBody')">⚡ 歷史用電量查詢 <span class="acc-arrow" id="elecHistoryBody-arrow">▸</span></div>
+        <div class="acc-content" id="elecHistoryBody">
+          <select id="elecHistoryRoomSelect"></select>
+          <button class="secondary" onclick="loadElecHistory()">查詢近12期用電量</button>
+          <div id="elecHistoryList" style="margin-top:8px;"></div>
+        </div>
+      </div>
+
+      <div class="acc">
+        <div class="acc-header" onclick="toggleSection('moveOutBody')">🚪 退租登記 <span class="acc-arrow" id="moveOutBody-arrow">▸</span></div>
+        <div class="acc-content" id="moveOutBody">
+          <select id="moveOutRoomSelect" onchange="onMoveOutRoomChange()"></select>
+          <div id="moveOutTenantInfo"></div>
+          <input id="moveOutDate" type="date">
+          <label class="checkline" style="margin-top:-4px;">↑ 退租日期</label>
+          <input id="moveOutDeposit" type="number" placeholder="押金金額">
+          <input id="moveOutRefund" type="number" placeholder="實際退還金額">
+          <select id="moveOutRefunded">
+            <option value="已退還">已退還</option>
+            <option value="未退還">未退還</option>
+            <option value="部分退還">部分退還</option>
+            <option value="依約不退還">依約不退還（例如合約未到期）</option>
+          </select>
+          <textarea id="moveOutReason" placeholder="原因/備註（例如：合約未到期依約不退押金）" rows="2"></textarea>
+          <button onclick="submitMoveOut()">登記退租並清空房號</button>
+          <p id="moveOutMsg"></p>
+        </div>
+      </div>
+
+      <div class="acc">
         <div class="acc-header" onclick="toggleSection('rosterBody')">📇 租戶名冊 <span class="acc-arrow" id="rosterBody-arrow">▸</span></div>
         <div class="acc-content" id="rosterBody">
           <button class="secondary" onclick="loadTenantRoster()">重新整理名冊</button>
@@ -524,7 +554,6 @@
       list.innerHTML = bills.map(function (b) {
         return '<div class="card">' +
           '<h3>' + b.房號 + ' ' + b.租戶姓名 + '</h3>' +
-          '<p>上期度數：' + b.上期用電度 + '　→　本期度數：' + b.本期用電度 + '</p>' +
           '<p>電費：' + b.電費 + ' 元｜水費：' + b.水費 + ' 元｜應繳：' + b.應繳金額 + ' 元</p>' +
           '<button onclick="shareBill(\'' + b.房號 + '\', \'' + (b.繳費單圖片網址 || '') + '\')">轉發給租戶</button>' +
           '</div>';
