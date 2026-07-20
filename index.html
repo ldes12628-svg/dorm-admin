@@ -209,7 +209,7 @@
         <div class="acc-content" id="meterBody">
           <select id="meterRoomSelect" onchange="onMeterRoomChange()"></select>
           <div id="meterRoomInfo"></div>
-          <input id="meterReadingInput" type="number" placeholder="輸入本期度數">
+          <input id="meterReadingInput" type="number" placeholder="輸入本期度數" oninput="onMeterInputAutosave()">
           <button onclick="saveMeterReading()">加入本次抄表清單</button>
           <div id="meterProgress"></div>
           <div id="meterFilledList"></div>
@@ -487,6 +487,8 @@
       loadRooms();
       loadMeterRooms();
       loadTenantRoomOptions();
+      loadElecHistoryRoomOptions();
+      loadMoveOutRoomOptions();
     }
 
     function loadPeriodOptions() {
@@ -701,6 +703,104 @@
       }).catch(function (err) {
         box.innerHTML = '<p style="color:#c00;">查詢失敗：' + err.message + '</p>';
       });
+    }
+
+    // ---------- 歷史用電量查詢 ----------
+
+    function loadElecHistoryRoomOptions() {
+      callApi('getAllRooms').then(function (rooms) {
+        var select = document.getElementById('elecHistoryRoomSelect');
+        select.innerHTML = '';
+        rooms.forEach(function (r) {
+          var opt = document.createElement('option');
+          opt.value = r.房號;
+          opt.innerText = r.房號 + ' ' + r.租戶姓名;
+          select.appendChild(opt);
+        });
+      });
+    }
+
+    function loadElecHistory() {
+      var room = document.getElementById('elecHistoryRoomSelect').value;
+      var box = document.getElementById('elecHistoryList');
+      if (!room) { box.innerHTML = ''; return; }
+      box.innerHTML = '查詢中…';
+      callApi('getRoomElectricityHistory', { room: room }).then(function (list) {
+        if (list.length === 0) { box.innerHTML = '<div class="card"><p>這個房號還沒有任何用電紀錄</p></div>'; return; }
+        box.innerHTML = list.map(function (r) {
+          return '<div class="status-row"><div class="row-top">' +
+            '<span>' + r.期別 + '</span><span>' + r.上期用電度 + ' → ' + r.本期用電度 + '（' + r.用電度數 + ' 度）</span></div>' +
+            '<div class="row-detail"><span>電費：' + r.電費 + ' 元</span></div></div>';
+        }).join('');
+      }).catch(function (err) {
+        box.innerHTML = '<p style="color:#c00;">查詢失敗：' + err.message + '</p>';
+      });
+    }
+
+    // ---------- 退租登記 ----------
+
+    function loadMoveOutRoomOptions() {
+      callApi('getAllRooms').then(function (rooms) {
+        var select = document.getElementById('moveOutRoomSelect');
+        select.innerHTML = '';
+        rooms.forEach(function (r) {
+          var opt = document.createElement('option');
+          opt.value = r.房號;
+          opt.innerText = r.房號 + ' ' + r.租戶姓名;
+          select.appendChild(opt);
+        });
+        onMoveOutRoomChange();
+        var today = new Date();
+        var y = today.getFullYear(), m = String(today.getMonth() + 1).padStart(2, '0'), d = String(today.getDate()).padStart(2, '0');
+        document.getElementById('moveOutDate').value = y + '-' + m + '-' + d;
+      });
+    }
+
+    function onMoveOutRoomChange() {
+      var room = document.getElementById('moveOutRoomSelect').value;
+      if (!room) return;
+      callApi('getTenantInfo', { room: room }).then(function (info) {
+        var infoBox = document.getElementById('moveOutTenantInfo');
+        if (!info || !info.租戶姓名) {
+          infoBox.innerText = '這個房號目前是空房，沒有租戶可以退租';
+          document.getElementById('moveOutDeposit').value = '';
+        } else {
+          infoBox.innerText = '目前租戶：' + info.租戶姓名 + '（原始押金：' + (info.押金 || 0) + ' 元）';
+          document.getElementById('moveOutDeposit').value = info.押金 || '';
+        }
+      });
+    }
+
+    function submitMoveOut() {
+      var room = document.getElementById('moveOutRoomSelect').value;
+      var moveOutDate = document.getElementById('moveOutDate').value;
+      var deposit = document.getElementById('moveOutDeposit').value;
+      var refund = document.getElementById('moveOutRefund').value;
+      var refunded = document.getElementById('moveOutRefunded').value;
+      var reason = document.getElementById('moveOutReason').value.trim();
+      var msg = document.getElementById('moveOutMsg');
+
+      if (!room) { msg.className = 'msg-err'; msg.innerText = '請選擇房號'; return; }
+
+      var summary = '房號：' + room + '\n退租日期：' + moveOutDate +
+        '\n押金金額：' + (deposit || 0) + ' 元\n實際退還：' + (refund || 0) + ' 元\n狀態：' + refunded +
+        (reason ? '\n備註：' + reason : '');
+      if (!confirm('確定要登記退租嗎？此房號會變成空房。\n\n' + summary)) return;
+
+      callApi('submitMoveOut', {
+        room: room, moveOutDate: moveOutDate, depositAmount: deposit,
+        refundAmount: refund, refunded: refunded, reason: reason, userId: userId
+      }).then(function (res) {
+        if (!res.success) { msg.className = 'msg-err'; msg.innerText = res.message; return; }
+        msg.className = 'msg-ok';
+        msg.innerText = '已登記 ' + room + '（' + res.tenantName + '）退租，房號已變成空房';
+        document.getElementById('moveOutRefund').value = '';
+        document.getElementById('moveOutReason').value = '';
+        loadRooms();
+        loadTenantRoomOptions();
+        loadMoveOutRoomOptions();
+        loadElecHistoryRoomOptions();
+      }).catch(function (err) { msg.className = 'msg-err'; msg.innerText = '登記失敗：' + err.message; });
     }
 
     // ---------- 照片上傳（收款/支出共用） ----------
@@ -920,6 +1020,24 @@
       if (!found) { info.innerText = ''; return; }
       info.innerText = '上期度數：' + found.上期度數 + (meterDraft[room] !== undefined ? '｜本次已填：' + meterDraft[room] + ' 度' : '');
       document.getElementById('meterReadingInput').value = meterDraft[room] !== undefined ? meterDraft[room] : '';
+    }
+
+    /**
+     * 打字當下就即時存進手機本機草稿（localStorage），不用等按「加入本次抄表清單」，
+     * 這樣就算填到一半畫面被跳開、忘記按按鈕，資料也不會遺失。
+     * 「加入本次抄表清單」按鈕保留給想明確確認、看到清單更新的操作習慣使用，兩者互相搭配都可以。
+     */
+    function onMeterInputAutosave() {
+      var room = document.getElementById('meterRoomSelect').value;
+      var val = document.getElementById('meterReadingInput').value;
+      if (!room) return;
+      if (val === '') {
+        delete meterDraft[room];
+      } else {
+        meterDraft[room] = val;
+      }
+      try { localStorage.setItem(METER_DRAFT_KEY, JSON.stringify(meterDraft)); } catch (e) {}
+      renderMeterFilledList();
     }
 
     function saveMeterReading() {
