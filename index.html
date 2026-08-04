@@ -389,7 +389,8 @@
   <script>
     var LIFF_ID = '2010574364-GyqCDEpu';
     var API_BASE = 'https://script.google.com/macros/s/AKfycbyJ-r3ocN9riXeskpYDTJyG5cVLVJ2tmZzjxX-ljFXujoRex0AdLp7jpPOKfhAt-Bk/exec';
-    var METER_API_BASE = 'https://script.google.com/macros/s/AKfycbzHvJEwrhzF5qwQlI3_n1ZEnJRs3o0zr08LbIQoQtanL0uL7-Jp1pcHTyqB4psX3hOMBg/exec';
+    // 用電抄表已整合進主系統 API_BASE（action=getMeterRoomsInternal / submitMeterReadingsInternal），
+    // 不再呼叫獨立的抄表系統，故移除 METER_API_BASE。
     var METER_DRAFT_KEY = 'meter_draft_v1';
 
     var userId = null;
@@ -984,14 +985,12 @@
       }).catch(function (err) { box.innerHTML = '<p style="color:#c00;">查詢失敗：' + err.message + '</p>'; });
     }
 
-    // ---------- 用電抄表（呼叫獨立的抄表系統 API） ----------
+    // ---------- 用電抄表（整合進主系統 API，直接讀寫「租戶主檔」／「月帳單」） ----------
 
     function loadMeterRooms() {
       document.getElementById('meterFilledList').innerHTML = '';
-      fetch(METER_API_BASE + '?action=getRooms').then(function (res) {
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        return res.json();
-      }).then(function (rooms) {
+      callApi('getMeterRoomsInternal').then(function (rooms) {
+        if (rooms && rooms.error) throw new Error(rooms.error);
         meterRooms = rooms;
         try { meterDraft = JSON.parse(localStorage.getItem(METER_DRAFT_KEY) || '{}'); } catch (e) { meterDraft = {}; }
         fillMeterRoomSelect();
@@ -1018,7 +1017,7 @@
       var found = meterRooms.filter(function (r) { return r.房號 === room; })[0];
       var info = document.getElementById('meterRoomInfo');
       if (!found) { info.innerText = ''; return; }
-      info.innerText = '上期度數：' + found.上期度數 + (meterDraft[room] !== undefined ? '｜本次已填：' + meterDraft[room] + ' 度' : '');
+      info.innerText = '上期度數：' + found.上期用電度 + (meterDraft[room] !== undefined ? '｜本次已填：' + meterDraft[room] + ' 度' : '');
       document.getElementById('meterReadingInput').value = meterDraft[room] !== undefined ? meterDraft[room] : '';
     }
 
@@ -1078,7 +1077,7 @@
       var abnormal = [];
       keys.forEach(function (room) {
         var found = meterRooms.filter(function (r) { return r.房號 === room; })[0];
-        var last = found ? Number(found.上期度數) || 0 : 0;
+        var last = found ? Number(found.上期用電度) || 0 : 0;
         var cur = Number(meterDraft[room]);
         var usage = cur - last;
         if (usage < 0) abnormal.push(room + '（本期' + cur + ' 小於上期' + last + '，用電量為負數）');
@@ -1093,10 +1092,10 @@
       msg.className = '';
       msg.innerText = '處理中，請稍候…';
 
-      fetch(METER_API_BASE, {
+      fetch(API_BASE, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({ readings: readings })
+        body: JSON.stringify({ action: 'submitMeterReadingsInternal', readings: readings, userId: userId })
       }).then(function (res) {
         if (!res.ok) throw new Error('HTTP ' + res.status);
         return res.json();
