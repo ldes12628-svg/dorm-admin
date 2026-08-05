@@ -595,11 +595,24 @@
       });
     }
 
+    /**
+     * 把 Google Drive 的 uc?export=view 連結，轉成走 Apps Script 的圖片中繼站網址，
+     * 因為 Google Drive 那種連結 LINE 常常抓取失敗（會抓到驗證頁面而不是圖片本體），
+     * 改成請 LINE 直接跟我們的 Apps Script 要圖片內容，分享才會穩定送達。
+     */
+    function toProxyImageUrl_(driveUrl) {
+      if (!driveUrl) return driveUrl;
+      var m = driveUrl.match(/[?&]id=([^&]+)/) || driveUrl.match(/\/d\/([^/]+)/);
+      if (!m) return driveUrl; // 不是 Drive 連結格式，原樣使用
+      return API_BASE + '?action=photo&id=' + m[1];
+    }
+
     function shareBill(room, imageUrl) {
       if (!imageUrl) {
         alert('這個房號的繳費單圖片網址尚未設定（用電抄表產生的帳單本身不含圖片，圖片要另外用「匯入繳費單圖片」的功能上傳）');
         return;
       }
+      imageUrl = toProxyImageUrl_(imageUrl);
       if (!liff.isInClient()) {
         alert('「轉發給租戶」需要在手機 LINE App 裡開啟這個頁面才能使用，在電腦瀏覽器測試不會有反應，這是正常現象。');
         return;
@@ -644,10 +657,10 @@
       box.innerHTML = list.map(function (r) {
         var cls = clsMap[r.狀態] || 's-unpaid';
         var detail = '';
-        if (r.應繳金額 !== undefined && r.應繳金額 !== null && (r.已收金額 > 0 || r.狀態 === '部分繳款')) {
+        if (r.應繳金額 !== undefined && r.應繳金額 !== null) {
           detail = '<div class="row-detail">' +
-            '<span>已收 ' + r.已收金額 + ' 元</span>' +
-            '<span>應繳 ' + r.應繳金額 + ' 元</span>' +
+            '<span>應繳 ' + r.應繳金額 + ' 元' + (r.金額為估算 ? '（未出帳單，暫估）' : '') + '</span>' +
+            (r.已收金額 > 0 ? '<span>已收 ' + r.已收金額 + ' 元</span>' : '') +
             (r.尚欠金額 > 0 ? '<span>尚欠 ' + r.尚欠金額 + ' 元</span>' : '') +
             '</div>';
         }
