@@ -210,7 +210,6 @@
           <select id="meterRoomSelect" onchange="onMeterRoomChange()"></select>
           <div id="meterRoomInfo"></div>
           <input id="meterReadingInput" type="number" placeholder="輸入本期度數" oninput="onMeterInputAutosave()">
-          <button onclick="saveMeterReading()">加入本次抄表清單</button>
           <div id="meterProgress"></div>
           <div id="meterFilledList"></div>
           <button class="secondary" onclick="submitMeterReadings()" style="margin-top:10px;">產生並寄出電費 Excel</button>
@@ -557,7 +556,7 @@
       list.innerHTML = bills.map(function (b) {
         return '<div class="card">' +
           '<h3>' + b.房號 + ' ' + b.租戶姓名 + '</h3>' +
-          '<p>電費：' + b.電費 + ' 元｜水費：' + b.水費 + ' 元｜應繳：' + b.應繳金額 + ' 元</p>' +
+          '<p>租金：' + b.房屋租金 + ' 元｜電費：' + b.電費 + ' 元｜水費：' + b.水費 + ' 元｜應繳：' + b.應繳金額 + ' 元</p>' +
           '<button onclick="shareBill(\'' + b.房號 + '\', \'' + (b.繳費單圖片網址 || '') + '\')">轉發給租戶</button>' +
           '</div>';
       }).join('');
@@ -598,15 +597,27 @@
 
     function shareBill(room, imageUrl) {
       if (!imageUrl) {
-        alert('這個房號的繳費單圖片網址尚未設定');
+        alert('這個房號的繳費單圖片網址尚未設定（用電抄表產生的帳單本身不含圖片，圖片要另外用「匯入繳費單圖片」的功能上傳）');
         return;
       }
-      liff.shareTargetPicker([
-        { type: 'image', originalContentUrl: imageUrl, previewImageUrl: imageUrl },
-        { type: 'text', text: room + ' 本期繳費單，請確認金額並於期限前繳費，謝謝。' }
-      ]).catch(function (err) {
+      if (!liff.isInClient()) {
+        alert('「轉發給租戶」需要在手機 LINE App 裡開啟這個頁面才能使用，在電腦瀏覽器測試不會有反應，這是正常現象。');
+        return;
+      }
+      if (!liff.isApiAvailable('shareTargetPicker')) {
+        alert('目前這個 LINE 版本不支援轉發功能，請確認手機上的 LINE App 是最新版本。');
+        return;
+      }
+      try {
+        liff.shareTargetPicker([
+          { type: 'image', originalContentUrl: imageUrl, previewImageUrl: imageUrl },
+          { type: 'text', text: room + ' 本期繳費單，請確認金額並於期限前繳費，謝謝。' }
+        ]).catch(function (err) {
+          alert('分享失敗：' + err);
+        });
+      } catch (err) {
         alert('分享失敗：' + err);
-      });
+      }
     }
 
     function loadStatus() {
@@ -1021,11 +1032,6 @@
       document.getElementById('meterReadingInput').value = meterDraft[room] !== undefined ? meterDraft[room] : '';
     }
 
-    /**
-     * 打字當下就即時存進手機本機草稿（localStorage），不用等按「加入本次抄表清單」，
-     * 這樣就算填到一半畫面被跳開、忘記按按鈕，資料也不會遺失。
-     * 「加入本次抄表清單」按鈕保留給想明確確認、看到清單更新的操作習慣使用，兩者互相搭配都可以。
-     */
     function onMeterInputAutosave() {
       var room = document.getElementById('meterRoomSelect').value;
       var val = document.getElementById('meterReadingInput').value;
@@ -1037,18 +1043,17 @@
       }
       try { localStorage.setItem(METER_DRAFT_KEY, JSON.stringify(meterDraft)); } catch (e) {}
       renderMeterFilledList();
+      updateMeterSelectLabel_(room);
     }
 
-    function saveMeterReading() {
-      var room = document.getElementById('meterRoomSelect').value;
-      var val = document.getElementById('meterReadingInput').value;
-      if (!room || val === '') { alert('請輸入本期度數'); return; }
-      meterDraft[room] = val;
-      try { localStorage.setItem(METER_DRAFT_KEY, JSON.stringify(meterDraft)); } catch (e) {}
-      fillMeterRoomSelect();
-      document.getElementById('meterRoomSelect').value = room;
-      renderMeterFilledList();
-      onMeterRoomChange();
+    // 打字當下就即時存進手機本機草稿（localStorage），不用另外按按鈕確認，
+    // 這樣就算填到一半畫面被切走、瀏覽器關掉，資料也不會遺失，下次打開會自動帶回來。
+    function updateMeterSelectLabel_(room) {
+      var select = document.getElementById('meterRoomSelect');
+      var opt = Array.prototype.filter.call(select.options, function (o) { return o.value === room; })[0];
+      var found = meterRooms.filter(function (r) { return r.房號 === room; })[0];
+      if (!opt || !found) return;
+      opt.innerText = found.房號 + (found.房客姓名 ? ' ' + found.房客姓名 : '') + (meterDraft[room] !== undefined ? '（已填）' : '');
     }
 
     function removeMeterDraft(room) {
