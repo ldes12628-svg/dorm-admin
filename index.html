@@ -296,7 +296,7 @@
       </div>
 
       <div class="acc">
-        <div class="acc-header" onclick="toggleSection('moveOutBody')">🚪 退租登記 <span class="acc-arrow" id="moveOutBody-arrow">▸</span></div>
+        <div class="acc-header" onclick="toggleSection('moveOutBody')">🚪 退租登錄 <span class="acc-arrow" id="moveOutBody-arrow">▸</span></div>
         <div class="acc-content" id="moveOutBody">
           <select id="moveOutRoomSelect" onchange="onMoveOutRoomChange()"></select>
           <div id="moveOutTenantInfo"></div>
@@ -326,7 +326,7 @@
       </div>
 
       <div class="acc">
-        <div class="acc-header" onclick="toggleSection('tenantBody')">🧍 租客資料維護 <span class="acc-arrow" id="tenantBody-arrow">▸</span></div>
+        <div class="acc-header" onclick="toggleSection('tenantBody')">🧍 新入住登錄 <span class="acc-arrow" id="tenantBody-arrow">▸</span></div>
         <div class="acc-content" id="tenantBody">
           <select id="tenantRoomSelect" onchange="onTenantRoomChange()"></select>
           <div id="tenantCurrentInfo"></div>
@@ -762,7 +762,7 @@
       });
     }
 
-    // ---------- 退租登記 ----------
+    // ---------- 退租登錄 ----------
 
     function loadMoveOutRoomOptions() {
       callApi('getAllRooms').then(function (rooms) {
@@ -1133,7 +1133,7 @@
       }).catch(function (err) { msg.className = 'msg-err'; msg.innerText = '送出失敗：' + err.message; });
     }
 
-    // ---------- 租客資料維護 ----------
+    // ---------- 新入住登錄 ----------
 
     function loadTenantRoomOptions() {
       callApi('getAllRooms').then(function (rooms) {
