@@ -595,23 +595,11 @@
       });
     }
 
-    /**
-     * 從 Google Drive 連結（uc?export=view&id=X 或 /d/X/ 格式）裡取出檔案 ID，
-     * 組成走 Apps Script 中繼站的網址。
-     */
-    function toProxyImageUrl_(driveUrl) {
-      if (!driveUrl) return driveUrl;
-      var m = driveUrl.match(/[?&]id=([^&]+)/) || driveUrl.match(/\/d\/([^/]+)/);
-      if (!m) return driveUrl;
-      return API_BASE + '?action=photo&id=' + m[1];
-    }
-
     function shareBill(room, imageUrl) {
       if (!imageUrl) {
         alert('這個房號的繳費單圖片網址尚未設定（用電抄表產生的帳單本身不含圖片，圖片要另外用「匯入繳費單圖片」的功能上傳）');
         return;
       }
-      imageUrl = toProxyImageUrl_(imageUrl);
       if (!liff.isInClient()) {
         alert('「轉發給租戶」需要在手機 LINE App 裡開啟這個頁面才能使用，在電腦瀏覽器測試不會有反應，這是正常現象。');
         return;
