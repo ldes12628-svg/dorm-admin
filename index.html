@@ -596,14 +596,13 @@
     }
 
     /**
-     * 把 Google Drive 的 uc?export=view 連結，轉成走 Apps Script 的圖片中繼站網址，
-     * 因為 Google Drive 那種連結 LINE 常常抓取失敗（會抓到驗證頁面而不是圖片本體），
-     * 改成請 LINE 直接跟我們的 Apps Script 要圖片內容，分享才會穩定送達。
+     * 從 Google Drive 連結（uc?export=view&id=X 或 /d/X/ 格式）裡取出檔案 ID，
+     * 組成走 Apps Script 中繼站的網址。
      */
     function toProxyImageUrl_(driveUrl) {
       if (!driveUrl) return driveUrl;
       var m = driveUrl.match(/[?&]id=([^&]+)/) || driveUrl.match(/\/d\/([^/]+)/);
-      if (!m) return driveUrl; // 不是 Drive 連結格式，原樣使用
+      if (!m) return driveUrl;
       return API_BASE + '?action=photo&id=' + m[1];
     }
 
