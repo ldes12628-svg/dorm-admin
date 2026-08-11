@@ -720,13 +720,13 @@
     // ---------- 歷史用電量查詢 ----------
 
     function loadElecHistoryRoomOptions() {
-      callApi('getAllRooms').then(function (rooms) {
+      callApi('getMeterRoomList').then(function (rooms) {
         var select = document.getElementById('elecHistoryRoomSelect');
         select.innerHTML = '';
         rooms.forEach(function (r) {
           var opt = document.createElement('option');
           opt.value = r.房號;
-          opt.innerText = r.房號 + ' ' + r.租戶姓名;
+          opt.innerText = r.房號;
           select.appendChild(opt);
         });
       });
