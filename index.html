@@ -216,7 +216,6 @@
           <p id="meterMsg"></p>
         </div>
       </div>
-
       <div class="acc">
         <div class="acc-header" onclick="toggleSection('billBody')">🧾 繳費單查詢 <span class="acc-arrow" id="billBody-arrow">▸</span></div>
         <div class="acc-content" id="billBody">
@@ -224,7 +223,6 @@
           <div id="billList"></div>
         </div>
       </div>
-
       <div class="acc">
         <div class="acc-header" onclick="toggleSection('statusBody')">📊 繳費狀況查詢 <span class="acc-arrow" id="statusBody-arrow">▸</span></div>
         <div class="acc-content" id="statusBody">
@@ -235,24 +233,6 @@
           <div id="statusList"></div>
         </div>
       </div>
-
-      <div class="acc">
-        <div class="acc-header" onclick="toggleSection('arrearsBody')">📋 欠費彙總 <span class="acc-arrow" id="arrearsBody-arrow">▸</span></div>
-        <div class="acc-content" id="arrearsBody">
-          <button class="secondary" onclick="loadArrears()">重新整理欠費彙總</button>
-          <input id="arrearsSearch" placeholder="輸入房號或租戶姓名查詢（例如：1AB 或 林惠蘭）" oninput="renderArrearsFiltered()">
-          <div id="arrearsList" style="margin-top:8px;"></div>
-        </div>
-      </div>
-
-      <div class="acc">
-        <div class="acc-header" onclick="toggleSection('reminderBody')">🔔 半年繳提醒 <span class="acc-arrow" id="reminderBody-arrow">▸</span></div>
-        <div class="acc-content" id="reminderBody">
-          <button class="secondary" onclick="loadReminders()">重新整理提醒清單</button>
-          <div id="reminderList" style="margin-top:8px;"></div>
-        </div>
-      </div>
-
       <div class="acc">
         <div class="acc-header" onclick="toggleSection('cashBody')">💵 現金收款登錄 <span class="acc-arrow" id="cashBody-arrow">▸</span></div>
         <div class="acc-content" id="cashBody">
@@ -267,7 +247,6 @@
           <div id="receiptResult"></div>
         </div>
       </div>
-
       <div class="acc">
         <div class="acc-header" onclick="toggleSection('expenseBody')">📤 支出登錄 <span class="acc-arrow" id="expenseBody-arrow">▸</span></div>
         <div class="acc-content" id="expenseBody">
@@ -285,16 +264,26 @@
           <div id="expenseTotal"></div>
         </div>
       </div>
-
       <div class="acc">
-        <div class="acc-header" onclick="toggleSection('elecHistoryBody')">⚡ 歷史用電量查詢 <span class="acc-arrow" id="elecHistoryBody-arrow">▸</span></div>
-        <div class="acc-content" id="elecHistoryBody">
-          <select id="elecHistoryRoomSelect"></select>
-          <button class="secondary" onclick="loadElecHistory()">查詢近12期用電量</button>
-          <div id="elecHistoryList" style="margin-top:8px;"></div>
+        <div class="acc-header" onclick="toggleSection('tenantBody')">🧍 新入住登錄 <span class="acc-arrow" id="tenantBody-arrow">▸</span></div>
+        <div class="acc-content" id="tenantBody">
+          <select id="tenantRoomSelect" onchange="onTenantRoomChange()"></select>
+          <div id="tenantCurrentInfo"></div>
+          <input id="tenantName" placeholder="租戶姓名">
+          <input id="tenantRent" type="number" placeholder="房屋租金">
+          <input id="tenantFirstRent" type="number" placeholder="首月租金（若與一般月租不同才填）">
+          <input id="tenantDeposit" type="number" placeholder="押金">
+          <input id="tenantWater" type="number" step="100" placeholder="水費（例如：100、200...）">
+          <input id="tenantMoveIn" type="date">
+          <input id="tenantPhone" placeholder="手機號碼">
+          <input id="tenantCashCollected" type="number" placeholder="本次入住總收現金金額（選填，例如押金+首月租金實收多少）">
+          <textarea id="tenantNote" placeholder="備註（選填）" rows="2"></textarea>
+          <input id="tenantNextDue" type="date">
+          <label class="checkline" style="margin-top:-4px;">↑ 下次收費日期（半年繳/季繳等非按月繳費才需要填）</label>
+          <button onclick="submitTenantUpdate()">更新房客資料</button>
+          <p id="tenantMsg"></p>
         </div>
       </div>
-
       <div class="acc">
         <div class="acc-header" onclick="toggleSection('moveOutBody')">🚪 退租登錄 <span class="acc-arrow" id="moveOutBody-arrow">▸</span></div>
         <div class="acc-content" id="moveOutBody">
@@ -315,33 +304,35 @@
           <p id="moveOutMsg"></p>
         </div>
       </div>
-
+      <div class="acc">
+        <div class="acc-header" onclick="toggleSection('reminderBody')">🔔 半年繳提醒 <span class="acc-arrow" id="reminderBody-arrow">▸</span></div>
+        <div class="acc-content" id="reminderBody">
+          <button class="secondary" onclick="loadReminders()">重新整理提醒清單</button>
+          <div id="reminderList" style="margin-top:8px;"></div>
+        </div>
+      </div>
+      <div class="acc">
+        <div class="acc-header" onclick="toggleSection('arrearsBody')">📋 欠費彙總 <span class="acc-arrow" id="arrearsBody-arrow">▸</span></div>
+        <div class="acc-content" id="arrearsBody">
+          <button class="secondary" onclick="loadArrears()">重新整理欠費彙總</button>
+          <input id="arrearsSearch" placeholder="輸入房號或租戶姓名查詢（例如：1AB 或 林惠蘭）" oninput="renderArrearsFiltered()">
+          <div id="arrearsList" style="margin-top:8px;"></div>
+        </div>
+      </div>
+      <div class="acc">
+        <div class="acc-header" onclick="toggleSection('elecHistoryBody')">⚡ 歷史用電量查詢 <span class="acc-arrow" id="elecHistoryBody-arrow">▸</span></div>
+        <div class="acc-content" id="elecHistoryBody">
+          <select id="elecHistoryRoomSelect"></select>
+          <button class="secondary" onclick="loadElecHistory()">查詢近12期用電量</button>
+          <div id="elecHistoryList" style="margin-top:8px;"></div>
+        </div>
+      </div>
       <div class="acc">
         <div class="acc-header" onclick="toggleSection('rosterBody')">📇 租戶名冊 <span class="acc-arrow" id="rosterBody-arrow">▸</span></div>
         <div class="acc-content" id="rosterBody">
           <button class="secondary" onclick="loadTenantRoster()">重新整理名冊</button>
           <input id="rosterSearch" placeholder="輸入房號或租戶姓名查詢" oninput="renderRosterFiltered()">
           <div id="rosterList" style="margin-top:8px;"></div>
-        </div>
-      </div>
-
-      <div class="acc">
-        <div class="acc-header" onclick="toggleSection('tenantBody')">🧍 新入住登錄 <span class="acc-arrow" id="tenantBody-arrow">▸</span></div>
-        <div class="acc-content" id="tenantBody">
-          <select id="tenantRoomSelect" onchange="onTenantRoomChange()"></select>
-          <div id="tenantCurrentInfo"></div>
-          <input id="tenantName" placeholder="租戶姓名">
-          <input id="tenantRent" type="number" placeholder="房屋租金">
-          <input id="tenantFirstRent" type="number" placeholder="首月租金（若與一般月租不同才填）">
-          <input id="tenantDeposit" type="number" placeholder="押金">
-          <input id="tenantWater" type="number" step="100" placeholder="水費（例如：100、200...）">
-          <input id="tenantMoveIn" type="date">
-          <input id="tenantPhone" placeholder="手機號碼">
-          <textarea id="tenantNote" placeholder="備註（選填）" rows="2"></textarea>
-          <input id="tenantNextDue" type="date">
-          <label class="checkline" style="margin-top:-4px;">↑ 下次收費日期（半年繳/季繳等非按月繳費才需要填）</label>
-          <button onclick="submitTenantUpdate()">更新房客資料</button>
-          <p id="tenantMsg"></p>
         </div>
       </div>
 
@@ -1170,6 +1161,7 @@
       var phone = document.getElementById('tenantPhone').value.trim();
       var note = document.getElementById('tenantNote').value.trim();
       var nextDue = document.getElementById('tenantNextDue').value;
+      var cashCollected = document.getElementById('tenantCashCollected').value;
       var msg = document.getElementById('tenantMsg');
 
       if (!room) { msg.className = 'msg-err'; msg.innerText = '請選擇房號'; return; }
@@ -1188,17 +1180,20 @@
       } else {
         diffs.push('（新增房號資料）');
       }
+      if (cashCollected) diffs.push('本次收現金總額：' + cashCollected + ' 元');
 
       if (diffs.length === 0) { msg.className = 'msg-err'; msg.innerText = '沒有欄位被修改'; return; }
       if (!confirm('確定要送出以下變更嗎？\n\n' + diffs.join('\n'))) return;
 
       callApi('updateTenant', {
         room: room, name: name, rent: rent, deposit: deposit, moveInDate: moveIn,
-        phone: phone, water: water, note: note, firstRent: firstRent, nextDueDate: nextDue, userId: userId
+        phone: phone, water: water, note: note, firstRent: firstRent, nextDueDate: nextDue,
+        cashCollected: cashCollected, userId: userId
       }).then(function (res) {
         if (!res.success) { msg.className = 'msg-err'; msg.innerText = res.message; return; }
         msg.className = 'msg-ok';
         msg.innerText = '更新成功：\n' + diffs.join('\n');
+        document.getElementById('tenantCashCollected').value = '';
         loadRooms();
         loadTenantRoomOptions();
       }).catch(function (err) { msg.className = 'msg-err'; msg.innerText = '更新失敗：' + err.message; });
