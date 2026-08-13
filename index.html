@@ -305,6 +305,14 @@
         </div>
       </div>
       <div class="acc">
+        <div class="acc-header" onclick="toggleSection('logStatusBody')">📋 本月登錄狀態 <span class="acc-arrow" id="logStatusBody-arrow">▸</span></div>
+        <div class="acc-content" id="logStatusBody">
+          <p style="font-size:13px;color:#666;">每月 27 號到月底，如果本期還沒標記完成，系統會 LINE 提醒確認「現金收款登錄／支出登錄／新入住登錄／退租登錄」是不是都處理好了。都確認完成後，點下面按鈕標記，這期就不會再收到提醒。</p>
+          <p id="logStatusText">載入中…</p>
+          <button onclick="markMonthlyLogComplete()">✅ 本月已全部登錄完成</button>
+        </div>
+      </div>
+      <div class="acc">
         <div class="acc-header" onclick="toggleSection('reminderBody')">🔔 半年繳提醒 <span class="acc-arrow" id="reminderBody-arrow">▸</span></div>
         <div class="acc-content" id="reminderBody">
           <button class="secondary" onclick="loadReminders()">重新整理提醒清單</button>
@@ -480,6 +488,7 @@
       loadTenantRoomOptions();
       loadElecHistoryRoomOptions();
       loadMoveOutRoomOptions();
+      loadMonthlyLogStatus();
     }
 
     function loadPeriodOptions() {
@@ -804,6 +813,31 @@
         loadMoveOutRoomOptions();
         loadElecHistoryRoomOptions();
       }).catch(function (err) { msg.className = 'msg-err'; msg.innerText = '登記失敗：' + err.message; });
+    }
+
+    // ---------- 本月登錄狀態 ----------
+
+    function loadMonthlyLogStatus() {
+      var textEl = document.getElementById('logStatusText');
+      textEl.innerText = '載入中…';
+      callApi('getMonthlyLogStatus').then(function (res) {
+        if (res.completed) {
+          textEl.innerText = '本期（' + res.period + '）已標記完成 ✅';
+        } else {
+          textEl.innerText = '本期（' + res.period + '）尚未標記完成';
+        }
+      }).catch(function (err) {
+        textEl.innerText = '載入失敗：' + err.message;
+      });
+    }
+
+    function markMonthlyLogComplete() {
+      if (!confirm('確定本期的現金收款登錄／支出登錄／新入住登錄／退租登錄都已經處理完成了嗎？\n標記後這期就不會再收到行政登錄提醒。')) return;
+      callApi('setMonthlyLogComplete', { userId: userId }).then(function (res) {
+        if (!res.success) { alert(res.message); return; }
+        alert('已標記本期（' + res.period + '）登錄完成！');
+        loadMonthlyLogStatus();
+      }).catch(function (err) { alert('標記失敗：' + err.message); });
     }
 
     // ---------- 照片上傳（收款/支出共用） ----------
