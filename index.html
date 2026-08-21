@@ -275,8 +275,11 @@
           <input id="tenantDeposit" type="number" placeholder="押金">
           <input id="tenantWater" type="number" step="100" placeholder="水費（例如：100、200...）">
           <input id="tenantMoveIn" type="date">
-          <input id="tenantPhone" placeholder="手機號碼">
+          <input id="tenantPhone" placeholder="聯絡電話（手機或市話皆可）">
           <input id="tenantCashCollected" type="number" placeholder="本次入住總收現金金額（選填，例如押金+首月租金實收多少）">
+          <label class="checkline" style="margin-top:8px;">合約書照片（選填）</label>
+          <input type="file" id="tenantContractPhotoInput" accept="image/*" onchange="onTenantContractPhotoSelected(this)">
+          <p id="tenantContractPhotoStatus" style="font-size:12px;color:#666;"></p>
           <textarea id="tenantNote" placeholder="備註（選填）" rows="2"></textarea>
           <input id="tenantNextDue" type="date">
           <label class="checkline" style="margin-top:-4px;">↑ 下次收費日期（半年繳/季繳等非按月繳費才需要填）</label>
@@ -307,7 +310,7 @@
       <div class="acc">
         <div class="acc-header" onclick="toggleSection('logStatusBody')">📋 本月登錄狀態 <span class="acc-arrow" id="logStatusBody-arrow">▸</span></div>
         <div class="acc-content" id="logStatusBody">
-          <p style="font-size:13px;color:#666;">每月 27 號到月底，如果本期還沒標記完成，系統會 LINE 提醒確認「現金收款登錄／支出登錄／新入住登錄／退租登錄」是不是都處理好了。都確認完成後，點下面按鈕標記，這期就不會再收到提醒。</p>
+          <p style="font-size:13px;color:#666;">每月 10 號起，如果本期還沒標記完成，系統會 LINE 提醒確認「現金收款登錄／支出登錄／新入住登錄／退租登錄」是不是都處理好了。都確認完成後，點下面按鈕標記，這期就不會再收到提醒。</p>
           <p id="logStatusText">載入中…</p>
           <button onclick="markMonthlyLogComplete()">✅ 本月已全部登錄完成</button>
         </div>
@@ -402,6 +405,7 @@
     var isSubmittingCash = false;
     var cashPhotoUrl = '';
     var expensePhotoUrl = '';
+    var tenantContractPhotoUrl = '';
     var rosterData = [];
 
     window.onerror = function (msg, url, line) {
@@ -884,6 +888,12 @@
       uploadPhotoFile_(input.files[0], 'expensePhotoStatus', function (url) { expensePhotoUrl = url; });
     }
 
+    function onTenantContractPhotoSelected(input) {
+      if (!input.files || !input.files[0]) return;
+      tenantContractPhotoUrl = '';
+      uploadPhotoFile_(input.files[0], 'tenantContractPhotoStatus', function (url) { tenantContractPhotoUrl = url; });
+    }
+
     // ---------- 租戶名冊 ----------
 
     function loadTenantRoster() {
@@ -913,7 +923,8 @@
           '<h3>' + t.房號 + ' ' + occ + '</h3>' +
           '<p>房租：' + t.房屋租金 + ' 元｜水費：' + t.水費 + ' 元｜押金：' + t.押金 + ' 元</p>' +
           '<p>入住日期：' + (t.入住日期 || '（無）') + '</p>' +
-          '<p>手機：' + (t.手機 || '（無）') + (t.備註 ? '｜備註：' + t.備註 : '') + '</p>' +
+          '<p>聯絡電話：' + (t.聯絡電話 || '（無）') + (t.備註 ? '｜備註：' + t.備註 : '') + '</p>' +
+          (t.合約書照片網址 ? '<p><a href="' + t.合約書照片網址 + '" target="_blank">📄 查看合約書照片</a></p>' : '') +
           '</div>';
       }).join('');
     }
@@ -1174,9 +1185,14 @@
         document.getElementById('tenantDeposit').value = info ? info.押金 : '';
         document.getElementById('tenantWater').value = info ? info.水費 : '';
         document.getElementById('tenantMoveIn').value = info ? info.入住日期 : '';
-        document.getElementById('tenantPhone').value = info ? info.手機 : '';
+        document.getElementById('tenantPhone').value = info ? info.聯絡電話 : '';
         document.getElementById('tenantNote').value = info ? info.備註 : '';
         document.getElementById('tenantNextDue').value = info ? info.下次收費日期 : '';
+        document.getElementById('tenantContractPhotoInput').value = '';
+        tenantContractPhotoUrl = (info && info.合約書照片網址) ? info.合約書照片網址 : '';
+        document.getElementById('tenantContractPhotoStatus').innerText = tenantContractPhotoUrl
+          ? '已有合約照片（不重新選檔就會保留原本的）'
+          : '';
         var noteBox = document.getElementById('tenantCurrentInfo');
         noteBox.innerText = (info && info.租戶姓名)
           ? '目前已有租戶資料，修改後送出前會先列出異動內容供確認'
@@ -1208,11 +1224,13 @@
         if (String(tenantOriginal.押金 || '') !== String(deposit || '')) diffs.push('押金：' + (tenantOriginal.押金 || 0) + ' → ' + (deposit || 0));
         if (String(tenantOriginal.水費 || '') !== String(water || '')) diffs.push('水費：' + (tenantOriginal.水費 || 0) + ' → ' + (water || 0));
         if ((tenantOriginal.入住日期 || '') !== moveIn) diffs.push('入住日期：' + (tenantOriginal.入住日期 || '（空）') + ' → ' + (moveIn || '（空）'));
-        if ((tenantOriginal.手機 || '') !== phone) diffs.push('手機：' + (tenantOriginal.手機 || '（空）') + ' → ' + (phone || '（空）'));
+        if ((tenantOriginal.聯絡電話 || '') !== phone) diffs.push('聯絡電話：' + (tenantOriginal.聯絡電話 || '（空）') + ' → ' + (phone || '（空）'));
         if ((tenantOriginal.備註 || '') !== note) diffs.push('備註：' + (tenantOriginal.備註 || '（空）') + ' → ' + (note || '（空）'));
         if ((tenantOriginal.下次收費日期 || '') !== nextDue) diffs.push('下次收費日期：' + (tenantOriginal.下次收費日期 || '（空）') + ' → ' + (nextDue || '（空）'));
+        if ((tenantOriginal.合約書照片網址 || '') !== tenantContractPhotoUrl) diffs.push('合約書照片：已更新');
       } else {
         diffs.push('（新增房號資料）');
+        if (tenantContractPhotoUrl) diffs.push('合約書照片：已上傳');
       }
       if (cashCollected) diffs.push('本次收現金總額：' + cashCollected + ' 元');
 
@@ -1222,7 +1240,7 @@
       callApi('updateTenant', {
         room: room, name: name, rent: rent, deposit: deposit, moveInDate: moveIn,
         phone: phone, water: water, note: note, firstRent: firstRent, nextDueDate: nextDue,
-        cashCollected: cashCollected, userId: userId
+        cashCollected: cashCollected, contractPhotoUrl: tenantContractPhotoUrl, userId: userId
       }).then(function (res) {
         if (!res.success) { msg.className = 'msg-err'; msg.innerText = res.message; return; }
         msg.className = 'msg-ok';
