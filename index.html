@@ -230,6 +230,7 @@
           <label class="checkline">
             <input type="checkbox" id="onlyUnpaid" checked onchange="renderStatus()" style="width:auto; margin:0;"> 只顯示未結清（未銷帳/已繳未銷/部分繳款）
           </label>
+          <p id="statusSummary" style="font-size:13px;color:#666;"></p>
           <div id="statusList"></div>
         </div>
       </div>
@@ -639,7 +640,17 @@
       var onlyUnpaid = document.getElementById('onlyUnpaid').checked;
       var list = onlyUnpaid ? allStatus.filter(function (r) { return r.狀態 !== '已銷帳'; }) : allStatus;
       var box = document.getElementById('statusList');
-      if (allStatus.length === 0) { box.innerHTML = ''; return; }
+      var summaryEl = document.getElementById('statusSummary');
+
+      if (allStatus.length === 0) { box.innerHTML = ''; summaryEl.innerText = ''; return; }
+
+      var unpaidCount = allStatus.filter(function (r) { return r.狀態 === '未銷帳'; }).length;
+      var partialCount = allStatus.filter(function (r) { return r.狀態 === '部分繳款'; }).length;
+      var unconfirmedCount = allStatus.filter(function (r) { return r.狀態 === '已繳未銷'; }).length;
+      summaryEl.innerText = '共 ' + allStatus.length + ' 戶　未銷帳 ' + unpaidCount + ' 位' +
+        (partialCount > 0 ? '　部分繳款 ' + partialCount + ' 位' : '') +
+        (unconfirmedCount > 0 ? '　已繳未銷 ' + unconfirmedCount + ' 位' : '');
+
       if (list.length === 0) {
         box.innerHTML = '<div class="card"><p>這期全部房號都已銷帳</p></div>';
         return;
@@ -855,14 +866,14 @@
       });
     }
 
-    function uploadPhotoFile_(file, statusElId, onDone) {
+    function uploadPhotoFile_(file, statusElId, onDone, folderName) {
       var statusEl = document.getElementById(statusElId);
       statusEl.innerText = '上傳中…';
       fileToBase64_(file).then(function (base64) {
         return fetch(API_BASE, {
           method: 'POST',
           headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify({ action: 'uploadPhoto', base64: base64, mimeType: file.type, fileName: file.name })
+          body: JSON.stringify({ action: 'uploadPhoto', base64: base64, mimeType: file.type, fileName: file.name, folderName: folderName })
         });
       }).then(function (res) { return res.json(); }).then(function (result) {
         if (result.success) {
@@ -891,7 +902,7 @@
     function onTenantContractPhotoSelected(input) {
       if (!input.files || !input.files[0]) return;
       tenantContractPhotoUrl = '';
-      uploadPhotoFile_(input.files[0], 'tenantContractPhotoStatus', function (url) { tenantContractPhotoUrl = url; });
+      uploadPhotoFile_(input.files[0], 'tenantContractPhotoStatus', function (url) { tenantContractPhotoUrl = url; }, '合約書照片');
     }
 
     // ---------- 租戶名冊 ----------
