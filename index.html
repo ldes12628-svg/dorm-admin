@@ -249,7 +249,10 @@
           <button id="cashSubmitBtn" onclick="submitCash()">確認收款並產生收據</button>
           <button id="cashCancelEditBtn" class="secondary" style="display:none;" onclick="cancelEditCash()">取消編輯</button>
           <div style="margin-top:14px;border-top:1px solid #eee;padding-top:10px;">
-            <button class="secondary" onclick="loadCashReceipts()">查詢這一期的現金收款登錄紀錄</button>
+            <label class="checkline">登錄日期（查詢這一天登錄的紀錄，預設今天）</label>
+            <input id="cashQueryDate" type="date">
+            <button class="secondary" onclick="loadCashReceipts()">查詢這天登錄的現金收款紀錄</button>
+            <button class="secondary" style="margin-top:6px;" onclick="loadCashReceipts('period')">查詢整期紀錄（依上方選的期別）</button>
             <div id="cashRecordList"></div>
             <p id="cashRecordTotal" style="font-weight:bold;"></p>
           </div>
@@ -269,7 +272,10 @@
           <button id="expenseSubmitBtn" onclick="submitExpense()">登錄支出</button>
           <button id="expenseCancelEditBtn" class="secondary" style="display:none;" onclick="cancelEditExpense()">取消編輯</button>
           <p id="expenseMsg"></p>
-          <button class="secondary" onclick="loadExpenses()">查詢本期支出</button>
+          <label class="checkline">登錄日期（查詢這一天登錄的紀錄，預設今天）</label>
+          <input id="expenseQueryDate" type="date">
+          <button class="secondary" onclick="loadExpenses()">查詢這天登錄的支出紀錄</button>
+          <button class="secondary" style="margin-top:6px;" onclick="loadExpenses('period')">查詢整期紀錄（依上方選的期別）</button>
           <div id="expenseList" style="margin-top:8px;"></div>
           <div id="expenseTotal"></div>
         </div>
@@ -287,7 +293,7 @@
           <input id="tenantMoveIn" type="date">
           <input id="tenantPhone" placeholder="聯絡電話（手機或市話皆可）">
           <input id="tenantCashCollected" type="number" placeholder="本次入住總收現金金額（選填，例如押金+首月租金實收多少）">
-          <label class="checkline" style="margin-top:8px;">合約書照片（選填）</label>
+          <label class="checkline" style="margin-top:8px;">合約書照片（選填，照片檔名會是「房號_姓名」，請先選好房號、填好姓名再上傳）</label>
           <input type="file" id="tenantContractPhotoInput" accept="image/*" onchange="onTenantContractPhotoSelected(this)">
           <p id="tenantContractPhotoStatus" style="font-size:12px;color:#666;"></p>
           <textarea id="tenantNote" placeholder="備註（選填）" rows="2"></textarea>
@@ -519,6 +525,8 @@
         var y = today.getFullYear(), m = String(today.getMonth() + 1).padStart(2, '0'), d = String(today.getDate()).padStart(2, '0');
         document.getElementById('expenseDate').value = y + '-' + m + '-' + d;
         var cpd = document.getElementById('cashPaymentDate'); if (cpd) cpd.value = y + '-' + m + '-' + d;
+        var cqd = document.getElementById('cashQueryDate'); if (cqd) cqd.value = y + '-' + m + '-' + d;
+        var eqd = document.getElementById('expenseQueryDate'); if (eqd) eqd.value = y + '-' + m + '-' + d;
       }).catch(function (err) {
         document.getElementById('statusList').innerHTML = '<p style="color:#c00;">期別載入失敗：' + err.message + '</p>';
       });
@@ -924,7 +932,12 @@
     function onTenantContractPhotoSelected(input) {
       if (!input.files || !input.files[0]) return;
       tenantContractPhotoUrl = '';
-      uploadPhotoFile_(input.files[0], 'tenantContractPhotoStatus', function (url) { tenantContractPhotoUrl = url; }, '合約書照片');
+      var room = document.getElementById('tenantRoomSelect').value;
+      var tname = document.getElementById('tenantName').value.trim();
+      var ext = (input.files[0].name.match(/\.[^.]+$/) || ['.jpg'])[0];
+      var base = (room || '') + (tname ? '_' + tname : '');
+      var customName = base ? base.replace(/[\\\/:*?"<>|]/g, '_') + ext : '';
+      uploadPhotoFile_(input.files[0], 'tenantContractPhotoStatus', function (url) { tenantContractPhotoUrl = url; }, '合約書照片', customName);
     }
 
     // ---------- 租戶名冊 ----------
@@ -1039,6 +1052,7 @@
         document.getElementById('cashPhotoInput').value = '';
         document.getElementById('cashPhotoStatus').innerText = '';
         cashPhotoUrl = '';
+        document.getElementById('cashQueryDate').value = todayStr_();
         loadCashReceipts();
       }).catch(function (err) {
         isSubmittingCash = false;
@@ -1048,19 +1062,29 @@
       });
     }
 
-    function loadCashReceipts() {
-      var period = document.getElementById('cashPeriodSelect').value;
+    function loadCashReceipts(mode) {
       var box = document.getElementById('cashRecordList');
       var totalBox = document.getElementById('cashRecordTotal');
+      var params = {};
+      var titleText;
+      if (mode === 'period') {
+        params.period = document.getElementById('cashPeriodSelect').value;
+        titleText = '期別 ' + params.period + ' 整期';
+      } else {
+        var qd = document.getElementById('cashQueryDate').value || todayStr_();
+        params.regDate = qd;
+        titleText = qd + ' 登錄的';
+      }
       box.innerHTML = '查詢中…';
       totalBox.innerText = '';
-      callApi('getCashReceipts', { period: period }).then(function (res) {
+      callApi('getCashReceipts', params).then(function (res) {
         cashRecordCache = {};
-        if (res.items.length === 0) { box.innerHTML = '<p>這期尚無現金收款登錄紀錄</p>'; return; }
+        if (res.items.length === 0) { box.innerHTML = '<p>' + escHtml_(titleText) + '：沒有現金收款登錄紀錄</p>'; return; }
         box.innerHTML = res.items.map(function (r) {
           cashRecordCache[r.收據編號] = r;
           return '<div class="expense-row">' +
-            '<div><div class="e-item">' + escHtml_(r.日期) + '　' + escHtml_(r.房號) + ' ' + escHtml_(r.租戶姓名) + '</div>' +
+            '<div><div class="e-item">' + escHtml_(r.房號) + ' ' + escHtml_(r.租戶姓名) + '（期別 ' + escHtml_(r.繳費期別) + '）</div>' +
+            '<div class="e-note">收款日期：' + escHtml_(r.收款日期) + '｜登錄日期：' + escHtml_(r.登錄日期) + '</div>' +
             '<div class="e-note">收據編號：' + escHtml_(r.收據編號) + '</div>' +
             (r.備註 ? '<div class="e-note">' + escHtml_(r.備註) + '</div>' : '') +
             (r.照片網址 ? '<div class="e-note"><a href="' + escHtml_(r.照片網址) + '" target="_blank">查看照片</a></div>' : '') +
@@ -1070,7 +1094,7 @@
             '<div class="e-amount">' + r.金額 + ' 元</div>' +
             '</div>';
         }).join('');
-        totalBox.innerText = '本期現金收款合計：' + res.total + ' 元（共 ' + res.items.length + ' 筆）';
+        totalBox.innerText = titleText + '現金收款合計：' + res.total + ' 元（共 ' + res.items.length + ' 筆）';
       }).catch(function (err) { box.innerHTML = '<p style="color:#c00;">查詢失敗：' + err.message + '</p>'; });
     }
 
@@ -1083,7 +1107,7 @@
       roomSel.disabled = true;
       document.getElementById('amountInput').value = r.金額;
       document.getElementById('cashNoteInput').value = r.備註;
-      document.getElementById('cashPaymentDate').value = r.日期;
+      document.getElementById('cashPaymentDate').value = r.收款日期;
       cashPhotoUrl = r.照片網址 || '';
       document.getElementById('cashPhotoInput').value = '';
       document.getElementById('cashPhotoStatus').innerText = cashPhotoUrl ? '已有照片（不重新選檔就會保留原本的）' : '';
@@ -1143,13 +1167,11 @@
           msg.innerText = '登錄成功：' + res.item + ' ' + res.amount + ' 元（本期支出累計 ' + res['本期累計金額'] + ' 元）';
         }
         cancelEditExpense(true);
+        document.getElementById('expenseQueryDate').value = todayStr_();
         loadExpenses();
       }).catch(function (err) { msg.className = 'msg-err'; msg.innerText = (wasEditing ? '更新失敗：' : '登錄失敗：') + err.message; });
     }
 
-// （loadExpenses 已移到 submitExpense 旁邊）
-    function loadExpensesPlaceholder_() {
-    }
 
     function startEditExpense(expenseNo) {
       var e = expenseRecordCache[expenseNo];
@@ -1158,7 +1180,7 @@
       document.getElementById('expenseDate').value = e.日期;
       document.getElementById('expenseItem').value = e.店家廠商;
       document.getElementById('expenseAmount').value = e.金額;
-      document.getElementById('expenseNote').value = e.備註;
+      document.getElementById('expenseNote').value = e.摘要;
       expensePhotoUrl = e.照片網址 || '';
       document.getElementById('expensePhotoInput').value = '';
       document.getElementById('expensePhotoStatus').innerText = expensePhotoUrl ? '已有照片（不重新選檔就會保留原本的）' : '';
@@ -1181,24 +1203,41 @@
       if (keepMsg !== true) document.getElementById('expenseMsg').innerText = '';
     }
 
-    function loadExpenses() {
-      var period = document.getElementById('expensePeriodSelect').value;
+    function loadExpenses(mode) {
       var box = document.getElementById('expenseList');
       var totalBox = document.getElementById('expenseTotal');
+      var params = {};
+      var titleText;
+      if (mode === 'period') {
+        params.period = document.getElementById('expensePeriodSelect').value;
+        titleText = '期別 ' + params.period + ' 整期';
+      } else {
+        var qd = document.getElementById('expenseQueryDate').value || todayStr_();
+        params.regDate = qd;
+        titleText = qd + ' 登錄的';
+      }
       box.innerHTML = '查詢中…';
       totalBox.innerText = '';
-      callApi('getExpenses', { period: period }).then(function (res) {
-        if (res.items.length === 0) { box.innerHTML = '<p>這期尚無支出紀錄</p>'; totalBox.innerText = ''; return; }
-        box.innerHTML = res.items.map(function (e) {
+      callApi('getExpenses', params).then(function (res) {
+        expenseRecordCache = {};
+        if (res.items.length === 0) { box.innerHTML = '<p>' + escHtml_(titleText) + '：沒有支出登錄紀錄</p>'; totalBox.innerText = ''; return; }
+        box.innerHTML = res.items.map(function (e, idx) {
+          var key = e.支出編號 || ('舊資料' + idx);
+          expenseRecordCache[key] = e;
           return '<div class="expense-row">' +
-            '<div><div class="e-item">' + e.日期 + ' ' + e.項目 + '</div>' +
-            (e.備註 ? '<div class="e-note">' + e.備註 + '</div>' : '') +
-            (e.照片網址 ? '<div class="e-note"><a href="' + e.照片網址 + '" target="_blank">查看照片</a></div>' : '') +
+            '<div><div class="e-item">' + escHtml_(e.店家廠商) + '</div>' +
+            (e.摘要 ? '<div class="e-note">' + escHtml_(e.摘要) + '</div>' : '') +
+            '<div class="e-note">支出日期：' + escHtml_(e.日期) + '｜登錄：' + escHtml_(e.登錄時間) + '</div>' +
+            (e.照片網址 ? '<div class="e-note"><a href="' + escHtml_(e.照片網址) + '" target="_blank">查看照片</a></div>' : '') +
+            (e.更新註記 ? '<div class="e-note" style="color:#d9822b;white-space:pre-line;">✏️ ' + escHtml_(e.更新註記) + '</div>' : '') +
+            (e.支出編號
+              ? '<button class="secondary" style="width:auto;padding:4px 12px;margin-top:6px;" onclick="startEditExpense(\'' + escHtml_(e.支出編號) + '\')">編輯</button>'
+              : '<div class="e-note" style="color:#999;">（舊資料，請先在試算表選單執行「補齊舊紀錄欄位」才能編輯）</div>') +
             '</div>' +
             '<div class="e-amount">' + e.金額 + ' 元</div>' +
             '</div>';
         }).join('');
-        totalBox.innerText = '本期支出合計：' + res.total + ' 元';
+        totalBox.innerText = titleText + '支出合計：' + res.total + ' 元（共 ' + res.items.length + ' 筆）';
       }).catch(function (err) { box.innerHTML = '<p style="color:#c00;">查詢失敗：' + err.message + '</p>'; });
     }
 
