@@ -975,6 +975,30 @@
       }).join('');
     }
 
+    // Drive 的 uc?export=view 圖片直連在手機 LINE 內建瀏覽器常常打不開，
+    // 所有指向 Google Drive 的連結一律改成開「Drive 檔案檢視頁」，並用外部瀏覽器開啟。
+    function driveViewUrl_(url) {
+      var m = String(url).match(/[?&]id=([\w-]+)/) || String(url).match(/\/d\/([\w-]+)/);
+      return m ? 'https://drive.google.com/file/d/' + m[1] + '/view' : url;
+    }
+
+    function openExternalUrl_(url) {
+      try {
+        if (typeof liff !== 'undefined' && liff.isInClient && liff.isInClient()) {
+          liff.openWindow({ url: url, external: true });
+          return;
+        }
+      } catch (err) { /* 失敗就退回一般開新視窗 */ }
+      window.open(url, '_blank');
+    }
+
+    document.addEventListener('click', function (ev) {
+      var a = ev.target && ev.target.closest ? ev.target.closest('a[target="_blank"]') : null;
+      if (!a || !/drive\.google\.com/.test(a.href)) return;
+      ev.preventDefault();
+      openExternalUrl_(driveViewUrl_(a.href));
+    });
+
     function todayStr_() {
       var d = new Date();
       var mm = ('0' + (d.getMonth() + 1)).slice(-2);
@@ -1041,7 +1065,7 @@
           '<p>收據編號：' + res.receiptNo + '</p>' +
           '<p>收款日期：' + res.date + '</p>' +
           '<p>本次收款：' + res.本次收款 + ' 元｜累計已收：' + res.累計已收 + ' 元' + (res.應繳金額 != null ? '｜應繳：' + res.應繳金額 + ' 元' : '') + '</p>' +
-          '<p>本期現金收款累計：' + res.本期累計金額 + ' 元</p>' +
+          '<p>本次登錄累計（今天、同一位管理員）：' + res.當次登錄金額加總 + ' 元</p>' +
           '<p class="r-note">' + noteText + '</p>' +
           (res.備註 ? '<p>備註：' + res.備註 + '</p>' : '') +
           (res.照片網址 ? '<p><a href="' + res.照片網址 + '" target="_blank">查看已上傳照片</a></p>' : '') +
@@ -1164,7 +1188,7 @@
         if (wasEditing) {
           msg.innerText = res.changed === false ? '沒有欄位被修改' : '已更新「' + item + '」，並加註更新紀錄';
         } else {
-          msg.innerText = '登錄成功：' + res.item + ' ' + res.amount + ' 元（本期支出累計 ' + res['本期累計金額'] + ' 元）';
+          msg.innerText = '登錄成功：' + res.item + ' ' + res.amount + ' 元（本次登錄累計 ' + res['當次登錄金額加總'] + ' 元）';
         }
         cancelEditExpense(true);
         document.getElementById('expenseQueryDate').value = todayStr_();
