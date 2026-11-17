@@ -970,7 +970,7 @@
           '<p>房租：' + t.房屋租金 + ' 元｜水費：' + t.水費 + ' 元｜押金：' + t.押金 + ' 元</p>' +
           '<p>入住日期：' + (t.入住日期 || '（無）') + '</p>' +
           '<p>聯絡電話：' + (t.聯絡電話 || '（無）') + (t.備註 ? '｜備註：' + t.備註 : '') + '</p>' +
-          (t.合約書照片網址 ? '<p><a href="' + t.合約書照片網址 + '" target="_blank">📄 查看合約書照片</a></p>' : '') +
+          (isHttpUrl_(t.合約書照片網址) ? '<p><a href="' + t.合約書照片網址 + '" target="_blank">📄 查看合約書照片</a></p>' : '') +
           '</div>';
       }).join('');
     }
@@ -998,6 +998,10 @@
       ev.preventDefault();
       openExternalUrl_(driveViewUrl_(a.href));
     });
+
+    function isHttpUrl_(u) {
+      return /^https?:\/\//i.test(String(u || ''));
+    }
 
     function todayStr_() {
       var d = new Date();
@@ -1068,7 +1072,7 @@
           '<p>本次登錄累計（今天、同一位管理員）：' + res.當次登錄金額加總 + ' 元</p>' +
           '<p class="r-note">' + noteText + '</p>' +
           (res.備註 ? '<p>備註：' + res.備註 + '</p>' : '') +
-          (res.照片網址 ? '<p><a href="' + res.照片網址 + '" target="_blank">查看已上傳照片</a></p>' : '') +
+          (isHttpUrl_(res.照片網址) ? '<p><a href="' + res.照片網址 + '" target="_blank">查看已上傳照片</a></p>' : '') +
           '<button onclick="printReceipt(\'' + res.receiptNo + '\',\'' + res.period + '\',\'' + room + '\',\'' + res.本次收款 + '\',\'' + res.date + '\',\'' + noteText + '\',\'' + (res.備註 || '') + '\')">列印三聯收據</button>' +
           '<button class="secondary" onclick="location.reload()">完成，繼續下一筆</button>';
         document.getElementById('amountInput').value = '';
@@ -1111,7 +1115,7 @@
             '<div class="e-note">收款日期：' + escHtml_(r.收款日期) + '｜登錄日期：' + escHtml_(r.登錄日期) + '</div>' +
             '<div class="e-note">收據編號：' + escHtml_(r.收據編號) + '</div>' +
             (r.備註 ? '<div class="e-note">' + escHtml_(r.備註) + '</div>' : '') +
-            (r.照片網址 ? '<div class="e-note"><a href="' + escHtml_(r.照片網址) + '" target="_blank">查看照片</a></div>' : '') +
+            (isHttpUrl_(r.照片網址) ? '<div class="e-note"><a href="' + escHtml_(r.照片網址) + '" target="_blank">查看照片</a></div>' : '') +
             (r.更新註記 ? '<div class="e-note" style="color:#d9822b;white-space:pre-line;">✏️ ' + escHtml_(r.更新註記) + '</div>' : '') +
             '<button class="secondary" style="width:auto;padding:4px 12px;margin-top:6px;" onclick="startEditCash(\'' + escHtml_(r.收據編號) + '\')">編輯</button>' +
             '</div>' +
@@ -1252,7 +1256,7 @@
             '<div><div class="e-item">' + escHtml_(e.店家廠商) + '</div>' +
             (e.摘要 ? '<div class="e-note">' + escHtml_(e.摘要) + '</div>' : '') +
             '<div class="e-note">支出日期：' + escHtml_(e.日期) + '｜登錄：' + escHtml_(e.登錄時間) + '</div>' +
-            (e.照片網址 ? '<div class="e-note"><a href="' + escHtml_(e.照片網址) + '" target="_blank">查看照片</a></div>' : '') +
+            (isHttpUrl_(e.照片網址) ? '<div class="e-note"><a href="' + escHtml_(e.照片網址) + '" target="_blank">查看照片</a></div>' : '') +
             (e.更新註記 ? '<div class="e-note" style="color:#d9822b;white-space:pre-line;">✏️ ' + escHtml_(e.更新註記) + '</div>' : '') +
             (e.支出編號
               ? '<button class="secondary" style="width:auto;padding:4px 12px;margin-top:6px;" onclick="startEditExpense(\'' + escHtml_(e.支出編號) + '\')">編輯</button>'
