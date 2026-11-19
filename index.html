@@ -325,6 +325,49 @@
           <p id="moveOutMsg"></p>
         </div>
       </div>
+
+      <div class="acc">
+        <div class="acc-header" onclick="toggleSection('swapBody')">🔄 換房登錄 <span class="acc-arrow" id="swapBody-arrow">▸</span></div>
+        <div class="acc-content" id="swapBody">
+          <p style="font-size:13px;color:#666;">租客換到另一間房（簽新合約）：舊房會登記退租並清空，新房填入租客資料。換房日期同時當成舊房退租日與新房入住日。新房的租金、押金不會帶入舊房金額，請自行填寫。</p>
+          <label class="checkline">舊房號（目前住的房間）</label>
+          <select id="swapOldRoomSelect" onchange="onSwapOldRoomChange()"></select>
+          <div id="swapOldInfo" style="font-size:13px;color:#666;"></div>
+          <label class="checkline" style="margin-top:8px;">新房號（要搬去的空房）</label>
+          <select id="swapNewRoomSelect"></select>
+          <label class="checkline" style="margin-top:8px;">換房日期（舊房退租日＝新房入住日）</label>
+          <input id="swapDate" type="date">
+
+          <p style="font-weight:bold;margin:14px 0 4px;">舊房退租結算</p>
+          <input id="swapOldDeposit" type="number" placeholder="舊房押金金額（自動帶入，可修改）">
+          <input id="swapRefund" type="number" placeholder="舊房實際退還金額（沒有退就填 0）">
+          <label class="checkline" style="margin-top:8px;">退還金額領取日期</label>
+          <input id="swapRefundDate" type="date">
+          <select id="swapRefunded">
+            <option value="已退還">已退還</option>
+            <option value="未退還">未退還</option>
+            <option value="部分退還">部分退還</option>
+            <option value="依約不退還">依約不退還（例如合約未到期）</option>
+          </select>
+          <textarea id="swapReason" placeholder="退租原因/備註（會自動加上「換房至 新房號」）" rows="2"></textarea>
+
+          <p style="font-weight:bold;margin:14px 0 4px;">新房租客與合約資料</p>
+          <input id="swapName" placeholder="租客姓名（自動帶入舊房住戶，可修改）">
+          <input id="swapPhone" placeholder="聯絡電話（手機或市話皆可）">
+          <input id="swapRent" type="number" placeholder="新房間的房屋租金（必填，不會帶入舊房金額）">
+          <input id="swapWater" type="number" step="100" placeholder="水費（例如：100、200...）">
+          <input id="swapDeposit" type="number" placeholder="新房間的押金金額（必填，不會帶入舊房金額）">
+          <input id="swapFirstRent" type="number" placeholder="首月租金（選填）">
+          <input id="swapNextDue" type="date">
+          <label class="checkline" style="margin-top:-4px;">↑ 下次收費日期（半年繳/年繳等非按月繳費才需要填）</label>
+          <label class="checkline" style="margin-top:8px;">合約書照片（選填，照片檔名會是「新房號_姓名」，請先選好新房號、填好姓名再上傳）</label>
+          <input type="file" id="swapContractPhotoInput" accept="image/*" onchange="onSwapContractPhotoSelected(this)">
+          <p id="swapContractPhotoStatus" style="font-size:12px;color:#666;"></p>
+          <textarea id="swapNote" placeholder="備註（選填，會自動加上「由 舊房號 換房」）" rows="2"></textarea>
+          <button id="swapSubmitBtn" onclick="submitRoomSwap()">登記換房</button>
+          <p id="swapMsg" style="white-space:pre-line;"></p>
+        </div>
+      </div>
       <div class="acc">
         <div class="acc-header" onclick="toggleSection('logStatusBody')">📋 本月登錄狀態 <span class="acc-arrow" id="logStatusBody-arrow">▸</span></div>
         <div class="acc-content" id="logStatusBody">
@@ -510,6 +553,7 @@
       loadTenantRoomOptions();
       loadElecHistoryRoomOptions();
       loadMoveOutRoomOptions();
+      loadSwapRoomOptions();
       loadMonthlyLogStatus();
     }
 
@@ -1001,6 +1045,128 @@
 
     function isHttpUrl_(u) {
       return /^https?:\/\//i.test(String(u || ''));
+    }
+
+    // ---------- 換房登錄 ----------
+    var swapContractPhotoUrl = '';
+    var isSubmittingSwap = false;
+
+    function loadSwapRoomOptions() {
+      callApi('getAllRooms').then(function (rooms) {
+        var oldSel = document.getElementById('swapOldRoomSelect');
+        var newSel = document.getElementById('swapNewRoomSelect');
+        var oldKeep = oldSel.value, newKeep = newSel.value;
+        oldSel.innerHTML = '';
+        newSel.innerHTML = '';
+        rooms.forEach(function (r) {
+          var opt = document.createElement('option');
+          opt.value = r.房號;
+          if (r.租戶姓名) {
+            opt.innerText = r.房號 + ' ' + r.租戶姓名;
+            oldSel.appendChild(opt);
+          } else {
+            opt.innerText = r.房號 + '（空房）';
+            newSel.appendChild(opt);
+          }
+        });
+        if (oldKeep) oldSel.value = oldKeep;
+        if (newKeep) newSel.value = newKeep;
+        if (!document.getElementById('swapDate').value) document.getElementById('swapDate').value = todayStr_();
+        onSwapOldRoomChange();
+      });
+    }
+
+    function onSwapOldRoomChange() {
+      var room = document.getElementById('swapOldRoomSelect').value;
+      var info = document.getElementById('swapOldInfo');
+      if (!room) { info.innerText = ''; return; }
+      callApi('getTenantInfo', { room: room }).then(function (t) {
+        if (!t) { info.innerText = ''; return; }
+        info.innerText = '目前住戶：' + (t.租戶姓名 || '（空房）') + '｜租金 ' + (t.房屋租金 || 0) + ' 元｜押金 ' + (t.押金 || 0) + ' 元｜入住日期 ' + (t.入住日期 || '（無）');
+        document.getElementById('swapName').value = t.租戶姓名 || '';
+        document.getElementById('swapPhone').value = t.聯絡電話 || '';
+        document.getElementById('swapOldDeposit').value = t.押金 || '';
+      });
+    }
+
+    function onSwapContractPhotoSelected(input) {
+      if (!input.files || !input.files[0]) return;
+      swapContractPhotoUrl = '';
+      var room = document.getElementById('swapNewRoomSelect').value;
+      var tname = document.getElementById('swapName').value.trim();
+      var ext = (input.files[0].name.match(/\.[^.]+$/) || ['.jpg'])[0];
+      var base = (room || '') + (tname ? '_' + tname : '');
+      var customName = base ? base.replace(/[\\\/:*?"<>|]/g, '_') + ext : '';
+      uploadPhotoFile_(input.files[0], 'swapContractPhotoStatus', function (url) { swapContractPhotoUrl = url; }, '合約書照片', customName);
+    }
+
+    function submitRoomSwap() {
+      if (isSubmittingSwap) return;
+      function val(id) { return document.getElementById(id).value.trim(); }
+      var oldRoom = val('swapOldRoomSelect'), newRoom = val('swapNewRoomSelect');
+      var swapDate = val('swapDate'), name = val('swapName'), phone = val('swapPhone');
+      var rent = val('swapRent'), water = val('swapWater'), deposit = val('swapDeposit');
+      var firstRent = val('swapFirstRent'), nextDue = val('swapNextDue'), note = val('swapNote');
+      var oldDeposit = val('swapOldDeposit'), refund = val('swapRefund'), refundDate = val('swapRefundDate');
+      var refunded = val('swapRefunded'), reason = val('swapReason');
+      var msg = document.getElementById('swapMsg');
+      msg.style.whiteSpace = 'pre-line';
+
+      function bad(text) { msg.className = 'msg-err'; msg.innerText = text; }
+      if (!oldRoom) { bad('請選擇舊房號'); return; }
+      if (!newRoom) { bad('請選擇新房號（要搬去的空房）'); return; }
+      if (!swapDate) { bad('請選擇換房日期'); return; }
+      if (!name) { bad('請輸入租客姓名'); return; }
+      if (rent === '') { bad('請輸入新房間的房屋租金（不會帶入舊房金額）'); return; }
+      if (deposit === '') { bad('請輸入新房間的押金金額（不會帶入舊房金額）'); return; }
+
+      var summary = '換房日期：' + swapDate + '\n\n' +
+        '舊房 ' + oldRoom + '：登記退租並清空（押金 ' + (oldDeposit || 0) + ' 元，實際退還 ' + (refund || 0) + ' 元，' + refunded + '）\n\n' +
+        '新房 ' + newRoom + '：填入 ' + name + '\n' +
+        '租金 ' + rent + ' 元｜水費 ' + (water || 0) + ' 元｜押金 ' + deposit + ' 元' +
+        (firstRent ? '｜首月租金 ' + firstRent + ' 元' : '') + (nextDue ? '｜下次收費日期 ' + nextDue : '') +
+        (swapContractPhotoUrl ? '\n已上傳合約書照片' : '') +
+        '\n\n送出後無法自動復原，確定要登記換房嗎？';
+      if (!confirm(summary)) return;
+
+      isSubmittingSwap = true;
+      var btn = document.getElementById('swapSubmitBtn');
+      btn.disabled = true;
+      btn.innerText = '處理中，請稍候…';
+      callApi('submitRoomSwap', {
+        oldRoom: oldRoom, newRoom: newRoom, swapDate: swapDate, name: name, phone: phone,
+        rent: rent, water: water, deposit: deposit, firstRent: firstRent, nextDueDate: nextDue,
+        note: note, contractPhotoUrl: swapContractPhotoUrl,
+        oldDeposit: oldDeposit, refundAmount: refund, refundDate: refundDate, refunded: refunded, reason: reason,
+        userId: userId
+      }).then(function (res) {
+        isSubmittingSwap = false;
+        btn.disabled = false;
+        btn.innerText = '登記換房';
+        if (!res.success) { bad(res.message); return; }
+        msg.className = 'msg-ok';
+        msg.innerText = '換房完成：' + res.oldRoom + ' → ' + res.newRoom + '（' + res.tenantName + '）\n' +
+          (res.warning ? res.warning + '\n' : '') +
+          '\n接下來請記得處理：\n' +
+          '1. 新房號當期的月帳單（沒有的話，收款會直接標已銷帳）\n' +
+          '2. 舊房號已開、還沒收的帳單\n' +
+          '3. 半年繳/年繳的月帳單鎖定與下次收費日期\n' +
+          '4. 押金補差額要收的話，到「現金收款登錄」登記';
+        ['swapRent', 'swapWater', 'swapDeposit', 'swapFirstRent', 'swapNextDue', 'swapNote', 'swapRefund', 'swapRefundDate', 'swapReason', 'swapContractPhotoInput'].forEach(function (id) {
+          document.getElementById(id).value = '';
+        });
+        document.getElementById('swapContractPhotoStatus').innerText = '';
+        swapContractPhotoUrl = '';
+        loadRooms();
+        loadTenantRoomOptions();
+        loadMoveOutRoomOptions();
+        loadSwapRoomOptions();
+      }).catch(function (err) {
+        isSubmittingSwap = false;
+        btn.disabled = false;
+        btn.innerText = '登記換房';
+        bad('登記失敗：' + err.message);
+      });
     }
 
     function todayStr_() {
